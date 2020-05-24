@@ -1,32 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-//! 0.0 .. 1.0 の値を kFrequencyMin .. kFrequencyMax の値に変換する。
-float paramToFreq(float param_value)
-{
-    constexpr double min_ = AudioPluginAudioProcessor::kFrequencyMin;
-    constexpr double max_ = AudioPluginAudioProcessor::kFrequencyMax;
-    
-    assert(0.0 <= param_value && param_value <= 1.0);
-    
-    return pow(max_ / min_, param_value) * min_;
-}
-
-float freqToParam(float freq)
-{
-    constexpr double min_ = AudioPluginAudioProcessor::kFrequencyMin;
-    constexpr double max_ = AudioPluginAudioProcessor::kFrequencyMax;
-    
-    auto log_with_base = [](double base, double x) {
-        // 底を base にして対数を計算する
-        return log(x) / log(base);
-    };
-
-    double const param = log_with_base(max_ / min_, (freq / min_));
-    
-    assert(0 <= param && param <= 1.0);
-}
-
 //==============================================================================
 AudioPluginAudioProcessor::AudioPluginAudioProcessor()
      : AudioProcessor (BusesProperties()
@@ -46,8 +20,8 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     
     freq_ = new AudioParameterFloat("freq", "Frequency", { 0.0, 1.0 }, 0.0,
                                     "Hz", AudioProcessorParameter::genericParameter,
-                                    [](float value, int max_len) -> juce::String { return juce::String(paramToFreq(value)); },
-                                    [](juce::String const &str) -> float {
+                                    [this](float value, int max_len) -> juce::String { return juce::String(paramToFreq(value)); },
+                                    [this](juce::String const &str) -> float {
                                         try {
                                             return freqToParam(std::stof(str.toRawUTF8()));
                                         } catch(...) {
@@ -55,8 +29,21 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                                         }
                                     }
                                     );
+    
+    low_freq_ = new AudioParameterFloat("lowfreq", "Low Frequency Limit", { kLowFreqMin, kLowFreqMax }, kLowFreqDefault,
+                                    "Hz", AudioProcessorParameter::genericParameter);
+    
+    high_freq_ = new AudioParameterFloat("highfreq", "High Frequency Limit", { kHighFreqMin, kHighFreqMax }, kHighFreqDefault,
+                                    "Hz", AudioProcessorParameter::genericParameter);
+    
+    qfactor_ = new AudioParameterFloat("qfactor", "Q Factor", { kQFactorMin, kQFactorMax }, kQFactorDefault,
+                                    "Hz", AudioProcessorParameter::genericParameter);
+
     addParameter(bypass_);
     addParameter(freq_);
+    addParameter(low_freq_);
+    addParameter(high_freq_);
+    addParameter(qfactor_);
     sample_history_.reserve(kNumBins * 2);
 }
 
@@ -136,8 +123,8 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     // initialisation that you need..
     juce::ignoreUnused (sampleRate, samplesPerBlock);
     
-    last_freq_ = kFrequencyMin;
-    smooth_freq_.setTargetValue(kFrequencyMin);
+    last_freq_ = paramToFreq(0.0);
+    smooth_freq_.setTargetValue(last_freq_);
     smooth_freq_.reset(sampleRate, 4.0 / sampleRate);
 
     filters_.resize(getTotalNumOutputChannels());
@@ -192,25 +179,29 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     bool const bypass = bypass_->get();
     float const freq = paramToFreq(freq_->get());
     smooth_freq_.setTargetValue(freq);
-    float const smoothed_freq = smooth_freq_.getNextValue();
-    if(freq != smoothed_freq) {
-        last_freq_ = smoothed_freq;
-        
-        auto coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, 5.0);
-        for(auto &f: filters_) {
-            f.setCoefficients(coeff);
-        }
-    }
     
     if(bypass) {
-        for(int channel = 0; channel < totalNumInputChannels; ++channel) {
-            auto* data = buffer.getWritePointer (channel);
-            std::fill_n(data, buffer.getNumSamples(), 0.0);
-        }
+        // do nothing.
     } else {
-        for(int channel = 0; channel < totalNumInputChannels; ++channel) {
-            auto* data = buffer.getWritePointer (channel);
-            filters_[channel].processSamples(data, buffer.getNumSamples());
+        //! 10 ms ずつ IIR フィルタの係数を更新する。
+        auto step = std::max<int>(1, (int)std::round(getSampleRate() / 1000.0));
+        for(int smp = 0, end = buffer.getNumSamples(); smp < end; smp += step) {
+            auto const num_to_process = std::min<int>(step, end - smp);
+            
+            float const smoothed_freq = smooth_freq_.getNextValue();
+            if(freq != smoothed_freq) {
+                last_freq_ = smoothed_freq;
+                
+                auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, 5.0);
+                for(auto &f: filters_) {
+                    f.setCoefficients(coeff);
+                }
+            }
+        
+            for(int channel = 0; channel < totalNumInputChannels; ++channel) {
+                auto* data = buffer.getWritePointer(channel) + smp;
+                filters_[channel].processSamples(data, num_to_process);
+            }
         }
     }
     
@@ -268,6 +259,34 @@ void AudioPluginAudioProcessor::getSampleHistory(std::vector<float> &hist)
     for(int i = 0, end = kNumBins; i < end; ++i) {
         hist[i] = sample_history_[(i + sample_write_pos_) % kNumBins];
     }
+}
+
+//! 0.0 .. 1.0 の値を kFrequencyMin .. kFrequencyMax の値に変換する。
+float AudioPluginAudioProcessor::paramToFreq(float param_value) const
+{
+    double const min_ = low_freq_->get();
+    double const max_ = high_freq_->get();
+    
+    assert(0.0 <= param_value && param_value <= 1.0);
+    
+    return pow(max_ / min_, param_value) * min_;
+}
+
+float AudioPluginAudioProcessor::freqToParam(float freq) const
+{
+    double const min_ = low_freq_->get();
+    double const max_ = high_freq_->get();
+    
+    freq = std::clamp<double>(freq, min_, max_);
+    
+    auto log_with_base = [](double base, double x) {
+        // 底を base にして対数を計算する
+        return log(x) / log(base);
+    };
+
+    double const param = log_with_base(max_ / min_, (freq / min_));
+    
+    assert(0 <= param && param <= 1.0);
 }
 
 //==============================================================================

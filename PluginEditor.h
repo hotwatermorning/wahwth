@@ -7,6 +7,9 @@
 //==============================================================================
 class AudioPluginAudioProcessorEditor
 :   public juce::AudioProcessorEditor
+,   juce::Slider::Listener
+,   juce::Button::Listener
+,   juce::ComboBox::Listener
 {
 public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
@@ -25,6 +28,11 @@ private:
     std::unique_ptr<Impl> pimpl_;
     
     void OnUpdateMouthAspectRatio();
+    
+    void buttonClicked(juce::Button *b) override {}
+    void buttonStateChanged(juce::Button *b) override;
+    void sliderValueChanged(juce::Slider *s) override;
+    void comboBoxChanged(juce::ComboBox *c) override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };

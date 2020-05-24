@@ -50,14 +50,29 @@ public:
     {
         Bypass = 0,
         Frequency,
+        HighFreq,
+        LowFreq,
+        QFactor,
         NumParams,
     };
     
     juce::AudioParameterBool *bypass_;
     juce::AudioParameterFloat *freq_;
+    juce::AudioParameterFloat *low_freq_;
+    juce::AudioParameterFloat *high_freq_;
+    juce::AudioParameterFloat *qfactor_;
     
-    static constexpr float kFrequencyMin = 120.0;
-    static constexpr float kFrequencyMax = 6000.0;
+    static constexpr float kQFactorMin = 0.1;
+    static constexpr float kQFactorMax = 7.0;
+    static constexpr float kQFactorDefault = 5.0;
+    
+    static constexpr float kLowFreqMin = 100;
+    static constexpr float kLowFreqMax = 1000;
+    static constexpr float kLowFreqDefault = 120;
+    
+    static constexpr float kHighFreqMin = 2000;
+    static constexpr float kHighFreqMax = 7500;
+    static constexpr float kHighFreqDefault = 6000;
     
     std::array<float, NumParams> parameters_;
 
@@ -70,6 +85,9 @@ public:
     
     //! @pre hist.size() >= kBinSize
     void getSampleHistory(std::vector<float> &hist);
+    
+    float paramToFreq(float param_value) const;
+    float freqToParam(float freq) const;
     
 private:
     //! 画面上のスペクトル表示のために、処理したサンプルを kNumBins だけ保存しておく。
