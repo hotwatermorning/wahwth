@@ -9,8 +9,8 @@
 
 bool kShowFace = true;
 
-int const kMinWidth = 120;
-int const kMinHeight = 90;
+int const kMinWidth = 400;
+int const kMinHeight = 300;
 int const kMaxWidth = 1200;
 int const kMaxHeight = 900;
 int const kDefaultWidth = 600;
@@ -234,6 +234,11 @@ public:
     juce::Slider sl_high_freq_;
     juce::Slider sl_qfactor_;
     juce::ToggleButton tgl_bypass_;
+
+    juce::Label lbl_bypass_;
+    juce::Label lbl_low_freq_;
+    juce::Label lbl_high_freq_;
+    juce::Label lbl_qfactor_;
     
 private:
     std::mutex mutable camera_mtx_; //!< カメラスレッドと画像処理スレッドの排他制御
@@ -468,15 +473,18 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     addAndMakeVisible(pimpl_->sl_qfactor_);
     addAndMakeVisible(pimpl_->sl_low_freq_);
     addAndMakeVisible(pimpl_->sl_high_freq_);
+    addAndMakeVisible(pimpl_->lbl_bypass_);
+    addAndMakeVisible(pimpl_->lbl_low_freq_);
+    addAndMakeVisible(pimpl_->lbl_high_freq_);
+    addAndMakeVisible(pimpl_->lbl_qfactor_);
     
     pimpl_->cmb_camera_list_.addItemList(juce::CameraDevice::getAvailableDevices(), 1);
-    pimpl_->sl_qfactor_.setSliderStyle(juce::Slider::LinearHorizontal);
-    pimpl_->sl_low_freq_.setSliderStyle(juce::Slider::LinearHorizontal);
-    pimpl_->sl_high_freq_.setSliderStyle(juce::Slider::LinearHorizontal);
+    pimpl_->sl_qfactor_.setSliderStyle(juce::Slider::LinearBar);
+    pimpl_->sl_low_freq_.setSliderStyle(juce::Slider::LinearBar);
+    pimpl_->sl_high_freq_.setSliderStyle(juce::Slider::LinearBar);
     
     pimpl_->sl_low_freq_.setTextValueSuffix(" Hz");
     pimpl_->sl_high_freq_.setTextValueSuffix(" Hz");
-    pimpl_->tgl_bypass_.setButtonText("Bypass");
     
     auto make_value_from_text_function = [](juce::Slider *slider) {
         return [slider](juce::String const &str) -> double {
@@ -522,6 +530,11 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     pimpl_->sl_low_freq_.addListener(this);
     pimpl_->sl_high_freq_.addListener(this);
     pimpl_->sl_qfactor_.addListener(this);
+    
+    pimpl_->lbl_bypass_.setText   ("Bypass", juce::NotificationType::dontSendNotification);
+    pimpl_->lbl_low_freq_.setText ("Freq Lo", juce::NotificationType::dontSendNotification);
+    pimpl_->lbl_high_freq_.setText("Freq Hi", juce::NotificationType::dontSendNotification);
+    pimpl_->lbl_qfactor_.setText  ("Q Factor", juce::NotificationType::dontSendNotification);
     
     for(int i = 0, end = pimpl_->cmb_camera_list_.getNumItems(); i < end; ++i) {
         if(pimpl_->openCamera(i)) {
@@ -666,12 +679,28 @@ void AudioPluginAudioProcessorEditor::resized()
     // subcomponents in your editor..
     
     auto b = getBounds().reduced(10);
-    auto right = b.removeFromRight(b.getWidth() / 4);
-    pimpl_->cmb_camera_list_.setBounds(right.removeFromTop(20));
-    pimpl_->tgl_bypass_.setBounds(right.removeFromTop(20));
-    pimpl_->sl_low_freq_.setBounds(right.removeFromTop(20));
-    pimpl_->sl_high_freq_.setBounds(right.removeFromTop(20));
-    pimpl_->sl_qfactor_.setBounds(right.removeFromTop(20));
+    auto right = b.removeFromRight(b.getWidth() / 3);
+    pimpl_->cmb_camera_list_.setBounds(right.removeFromTop(16));
+    right.removeFromTop(2);
+    
+    auto align_label_and_control = [](juce::Component &label,
+                                      juce::Component &control,
+                                      juce::Rectangle<int> b) {
+        label.setBounds(b.removeFromLeft((int)(b.getWidth() * 0.33)));
+        control.setBounds(b);
+    };
+    
+    align_label_and_control(pimpl_->lbl_bypass_, pimpl_->tgl_bypass_, right.removeFromTop(16));
+    right.removeFromTop(2);
+    
+    align_label_and_control(pimpl_->lbl_low_freq_, pimpl_->sl_low_freq_, right.removeFromTop(16));
+    right.removeFromTop(2);
+    
+    align_label_and_control(pimpl_->lbl_high_freq_, pimpl_->sl_high_freq_, right.removeFromTop(16));
+    right.removeFromTop(2);
+    
+    align_label_and_control(pimpl_->lbl_qfactor_, pimpl_->sl_qfactor_, right.removeFromTop(16));
+    right.removeFromTop(2);
 }
 
 void AudioPluginAudioProcessorEditor::OnUpdateMouthAspectRatio()
