@@ -459,6 +459,14 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 ,   processorRef(p)
 ,   pimpl_(std::make_unique<Impl>(this))
 {
+#if JUCE_WINDOWS
+    String typeFaceName = "Meiryo UI";
+    Desktop::getInstance().getDefaultLookAndFeel().setDefaultSansSerifTypefaceName(typeFaceName);
+#elif JUCE_MAC
+    String typeFaceName = "Arial Unicode MS";
+    Desktop::getInstance().getDefaultLookAndFeel().setDefaultSansSerifTypefaceName(typeFaceName);
+#endif
+    
     juce::ignoreUnused (processorRef);
     
     setResizable(true, true);
