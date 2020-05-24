@@ -170,6 +170,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         buffer.clear (i, 0, buffer.getNumSamples());
 
     float const freq = paramToFreq(freq_->get());
+    float const q = qfactor_->get();
     smooth_freq_.setTargetValue(freq);
     
     //! 30 ms ずつ IIR フィルタの係数を更新する。
@@ -181,7 +182,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         if(freq != smoothed_freq) {
             last_freq_ = smoothed_freq;
             
-            auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, 5.0);
+            auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, q);
             for(auto &f: filters_) {
                 f.setCoefficients(coeff);
             }
