@@ -12,12 +12,6 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                      #endif
                        )
 {
-    bypass_ = new AudioParameterBool("bypass", "Bypass", false,
-                                     "",
-                                     [](bool x, int max_len) -> juce::String { return "Bypass"; },
-                                     [](juce::String const &str) -> bool { return str.compareIgnoreCase("Bypass") == 0; }
-                                     );
-    
     freq_ = new AudioParameterFloat("freq", "Frequency", { 0.0, 1.0 }, 0.0,
                                     "Hz", AudioProcessorParameter::genericParameter,
                                     [this](float value, int max_len) -> juce::String { return juce::String(paramToFreq(value)); },
@@ -39,7 +33,6 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
     qfactor_ = new AudioParameterFloat("qfactor", "Q Factor", { kQFactorMin, kQFactorMax }, kQFactorDefault,
                                     "Hz", AudioProcessorParameter::genericParameter);
 
-    addParameter(bypass_);
     addParameter(freq_);
     addParameter(low_freq_);
     addParameter(high_freq_);
@@ -176,32 +169,27 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    bool const bypass = bypass_->get();
     float const freq = paramToFreq(freq_->get());
     smooth_freq_.setTargetValue(freq);
     
-    if(bypass) {
-        // do nothing.
-    } else {
-        //! 10 ms ずつ IIR フィルタの係数を更新する。
-        auto step = std::max<int>(1, (int)std::round(getSampleRate() / 1000.0));
-        for(int smp = 0, end = buffer.getNumSamples(); smp < end; smp += step) {
-            auto const num_to_process = std::min<int>(step, end - smp);
-            
-            float const smoothed_freq = smooth_freq_.getNextValue();
-            if(freq != smoothed_freq) {
-                last_freq_ = smoothed_freq;
-                
-                auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, 5.0);
-                for(auto &f: filters_) {
-                    f.setCoefficients(coeff);
-                }
-            }
+    //! 30 ms ずつ IIR フィルタの係数を更新する。
+    auto step = std::max<int>(1, (int)std::round(getSampleRate() * 30 / 1000.0));
+    for(int smp = 0, end = buffer.getNumSamples(); smp < end; smp += step) {
+        auto const num_to_process = std::min<int>(step, end - smp);
         
-            for(int channel = 0; channel < totalNumInputChannels; ++channel) {
-                auto* data = buffer.getWritePointer(channel) + smp;
-                filters_[channel].processSamples(data, num_to_process);
+        float const smoothed_freq = smooth_freq_.getNextValue();
+        if(freq != smoothed_freq) {
+            last_freq_ = smoothed_freq;
+            
+            auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, 5.0);
+            for(auto &f: filters_) {
+                f.setCoefficients(coeff);
             }
+        }
+    
+        for(int channel = 0; channel < totalNumInputChannels; ++channel) {
+            auto* data = buffer.getWritePointer(channel) + smp;
+            filters_[channel].processSamples(data, num_to_process);
         }
     }
     

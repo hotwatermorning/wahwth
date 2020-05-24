@@ -48,15 +48,13 @@ public:
     //Processor
     enum Parameters
     {
-        Bypass = 0,
-        Frequency,
+        Frequency = 0,
         HighFreq,
         LowFreq,
         QFactor,
         NumParams,
     };
     
-    juce::AudioParameterBool *bypass_;
     juce::AudioParameterFloat *freq_;
     juce::AudioParameterFloat *low_freq_;
     juce::AudioParameterFloat *high_freq_;

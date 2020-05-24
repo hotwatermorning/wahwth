@@ -8,7 +8,6 @@
 class AudioPluginAudioProcessorEditor
 :   public juce::AudioProcessorEditor
 ,   juce::Slider::Listener
-,   juce::Button::Listener
 ,   juce::ComboBox::Listener
 {
 public:
@@ -29,8 +28,6 @@ private:
     
     void OnUpdateMouthAspectRatio();
     
-    void buttonClicked(juce::Button *b) override {}
-    void buttonStateChanged(juce::Button *b) override;
     void sliderValueChanged(juce::Slider *s) override;
     void comboBoxChanged(juce::ComboBox *c) override;
 
