@@ -143,7 +143,7 @@ struct AudioPluginAudioProcessorEditor::Impl
         juce::Image image_;             //!< エディター画面で表示するカメラ画像
         MouthPointArray mouth_points_;  //!< エディター画面で表示する口の輪郭
         MovingAverageValue<double> mar_;
-        int num_skipped_ = 0;
+        int num_skipped_ = 0;           //!< 顔検出できなかったフレーム数。（検出できた時点で 0 にリセットされる）
         int num_processed_ = 0;
         
         void SetNumHistory(int n) {
@@ -413,6 +413,7 @@ private:
 
                 tmp_face_data.mar_.Push(tmp_mar);
                 tmp_face_data.num_processed_ += 1;
+                tmp_face_data.num_skipped_ = 0;
                 
                 if(kShowFace) {
                     tmp_face_data.image_ = std::move(rescaled);
@@ -618,7 +619,7 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour(col_bright);
     
     // 口の形状を描画する
-    if(points.size() > 0) {
+    if(face_data.num_skipped_ <= 2) {
         int left = 10000, top = 10000, right = 0, bottom = 0;
         
         for(auto const &pts: points) {
