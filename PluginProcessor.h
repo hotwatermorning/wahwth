@@ -55,10 +55,10 @@ public:
         NumParams,
     };
     
-    juce::AudioParameterFloat *freq_;
-    juce::AudioParameterFloat *low_freq_;
-    juce::AudioParameterFloat *high_freq_;
-    juce::AudioParameterFloat *qfactor_;
+    juce::AudioParameterFloat *freq_        = nullptr;
+    juce::AudioParameterFloat *low_freq_    = nullptr;
+    juce::AudioParameterFloat *high_freq_   = nullptr;
+    juce::AudioParameterFloat *qfactor_     = nullptr;
     
     // BPF のカットオフ周波数の位置パラメータの範囲
     // カットオフ周波数の位置パラメータが実際にどの周波数になるかは、 LowFreq/HighFreq のパラメータの状態による。
@@ -87,14 +87,6 @@ public:
     //! カメラ番号を読み込んだときに呼び出されるコールバック
     std::function<void(int)> on_load_camera_index_;
     
-    std::array<float, NumParams> parameters_;
-
-    std::vector<juce::IIRFilter> filters_;
-    float last_freq_;
-    float last_q_;
-    juce::SmoothedValue<float> smooth_freq_;
-    juce::SmoothedValue<float> smooth_q_;
-    
     static constexpr int kOrder = 8;
     static constexpr int kNumBins = 1 << kOrder;
     
@@ -104,12 +96,17 @@ public:
     float paramToFreq(float param_value) const;
     float freqToParam(float freq) const;
     
-private:
+private:    
     //! 画面上のスペクトル表示のために、処理したサンプルを kNumBins だけ保存しておく。
     //! ステレオ波形はモノラルにミックスダウンしてしまうため、 左右で逆相になっているような波形はうまく扱えないことに注意。
     std::mutex mtx_sample_history_;
     std::vector<float> sample_history_;
-    int sample_write_pos_ = 0;
+    int sample_write_pos_ = 0;    
+    std::vector<juce::IIRFilter> filters_;
+    float last_freq_;
+    float last_q_;
+    juce::SmoothedValue<float> smooth_freq_;
+    juce::SmoothedValue<float> smooth_q_;
     
 private:
     //==============================================================================

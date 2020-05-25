@@ -36,7 +36,7 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                                                     "Hz", AudioProcessorParameter::genericParameter
                                                     ));
                 
-    sample_history_.reserve(kNumBins * 2);
+    sample_history_.resize(kNumBins);
 }
 
 AudioPluginAudioProcessor::~AudioPluginAudioProcessor()
@@ -115,8 +115,8 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     // initialisation that you need..
     juce::ignoreUnused (sampleRate, samplesPerBlock);
     
-    last_freq_ = paramToFreq(0.0);
-    last_q_ = kQFactorDefault;
+    last_freq_ = -1;
+    last_q_ = -1;
     smooth_freq_.setTargetValue(last_freq_);
     smooth_freq_.reset(sampleRate, 2.0 / sampleRate);
     smooth_q_.setTargetValue(last_q_);
@@ -185,6 +185,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         float const smoothed_q = smooth_q_.getNextValue();
         if(freq != smoothed_freq || q != smoothed_q) {
             last_freq_ = smoothed_freq;
+            last_q_ = smoothed_q;
             
             auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, q);
             for(auto &f: filters_) {
