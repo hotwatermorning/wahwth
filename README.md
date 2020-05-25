@@ -2,6 +2,9 @@
 
 This is a Wah-Wah effector plugin which can be manipulated with your mouth.
 
+![captured.gif](https://user-images.githubusercontent.com/359226/82833785-0ddfba00-9efa-11ea-8d9e-ca701dbfb370.gif)
+
+
 ## Requirements
 
 * OpenCV (4.3 or later)
