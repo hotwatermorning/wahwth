@@ -203,11 +203,13 @@ struct AudioPluginAudioProcessorEditor::Impl
     {
         closeCamera();
         
+        // This function crashes on Bitwig Studio 3.1.
+        // Is there any workaround?
         cam_.reset(juce::CameraDevice::openDevice(index, kMinWidth, kMinHeight, kMaxWidth, kMaxHeight));
         if(cam_) {
             cam_->addListener(this);
             
-            // 小ウィンドウに登録しない。
+            // このウィンドウは表示しない。
             // （画面が顔の動きと反転しているのでこの画像はそのまま使わない。代わりに画像処理スレッドで処理した画像を反転して表示する）
             viewer_ = cam_->createViewerComponent();
             return true;
