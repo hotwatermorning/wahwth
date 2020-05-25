@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "AboutDialog.h"
 #include <algorithm>
 #include <opencv4/opencv2/opencv.hpp>
 #include <dlib/image_processing/frontal_face_detector.h>
@@ -612,7 +613,10 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     
     auto &points = face_data.mouth_points_;
     
-    g.setColour(juce::Colour(0.3f, 0.7f, 0.9f, 0.75f));
+    auto const col_bright = juce::Colour(0.3f, 0.7f, 0.9f, 0.75f);
+    auto const col_dark = juce::Colour(0.3f, 0.8f, 0.2f, 0.75f);
+
+    g.setColour(col_bright);
     
     // 口の形状を描画する
     if(points.size() > 0) {
@@ -677,7 +681,12 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     
     // スペクトルを描画する
     auto const &spectrum = pimpl_->calculateLogAmplitudeSpectrum();
-    auto const b = getBounds().reduced(30);
+    auto b = getBounds().reduced(10);
+    
+    b.removeFromTop(90);
+    
+    g.setColour(col_bright);
+    
     static double kLogEmphasisCoeff = 200; // この値が大きいほうが低音域が広く表示される。 [9 .. inf]
     float last_x = -1;
     for(int i = 0, end = spectrum.size()-1; i < end; ++i) {
@@ -772,5 +781,16 @@ void AudioPluginAudioProcessorEditor::comboBoxChanged(juce::ComboBox *c)
         }
     } else {
         assert(false);
+    }
+}
+
+void AudioPluginAudioProcessorEditor::mouseUp(juce::MouseEvent const&e)
+{
+    juce::PopupMenu menu;
+    menu.addItem(1, "About...");
+    
+    int result = menu.show();
+    if(result == 1) {
+        showModalAboutDialog(this);
     }
 }

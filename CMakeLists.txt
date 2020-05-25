@@ -82,6 +82,8 @@ target_sources(Wahwth PRIVATE
     PluginProcessor.cpp
     PluginEditor.h
     PluginProcessor.h
+    AboutDialog.cpp
+    AboutDialog.h
     )
 
 # `target_compile_definitions` adds some preprocessor definitions to our target. In a Projucer

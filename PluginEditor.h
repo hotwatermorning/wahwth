@@ -27,9 +27,10 @@ private:
     std::unique_ptr<Impl> pimpl_;
     
     void OnUpdateMouthAspectRatio();
-    
+
     void sliderValueChanged(juce::Slider *s) override;
     void comboBoxChanged(juce::ComboBox *c) override;
-
+    void mouseUp (juce::MouseEvent const&e) override;
+    
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessorEditor)
 };
