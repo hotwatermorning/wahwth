@@ -133,7 +133,7 @@ struct AudioPluginAudioProcessorEditor::Impl
         }
         
         signalThreadShouldExit();
-        juce::Thread::stopThread(1000);
+        juce::Thread::stopThread(5000);
     }
     
     struct FaceData
