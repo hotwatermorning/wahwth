@@ -287,15 +287,14 @@ private:
     {
         auto detector = dlib::get_frontal_face_detector();
         dlib::shape_predictor predictor;
-
-        // dlib の deserialize に std::stringstream を渡してもうまく読み込めなかったので、
-        // 一時ファイルを作成してそのファイルから読み込むようにする。
-        auto tmp_file = juce::File::createTempFile("shape_predictor");
-        auto os = tmp_file.createOutputStream();
-        os->write(BinaryData::shape_predictor_68_face_landmarks_dat,
-                  BinaryData::shape_predictor_68_face_landmarks_datSize);
-
-        dlib::deserialize(tmp_file.getFullPathName().toStdString()) >> predictor;
+ 
+        std::string tmp(BinaryData::shape_predictor_68_face_landmarks_dat,
+                        BinaryData::shape_predictor_68_face_landmarks_dat
+                        + BinaryData::shape_predictor_68_face_landmarks_datSize
+                        );
+        
+        std::stringstream ss(tmp);
+        dlib::deserialize(predictor, ss);
         
         std::vector<dlib::point> tmp_mouth_points(kNumMouthPoints);
         cv::Mat tmp_mat;
