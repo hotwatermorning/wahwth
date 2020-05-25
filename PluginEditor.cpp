@@ -218,9 +218,9 @@ struct AudioPluginAudioProcessorEditor::Impl
     void closeCamera()
     {
         if(cam_) {
-            cam_->removeListener(this);
             delete viewer_;
             viewer_ = nullptr;
+            cam_->removeListener(this);
             cam_.reset();
         }
     }
@@ -521,9 +521,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     pimpl_->sl_high_freq_.setRange(AP::kHighFreqMin, AP::kHighFreqMax);
     pimpl_->sl_qfactor_.setRange(AP::kQFactorMin, AP::kQFactorMax);
     
-    pimpl_->sl_low_freq_.setValue(AP::kLowFreqDefault, juce::dontSendNotification);
-    pimpl_->sl_high_freq_.setValue(AP::kHighFreqDefault, juce::dontSendNotification);
-    pimpl_->sl_qfactor_.setValue(AP::kQFactorDefault, juce::dontSendNotification);
+    pimpl_->sl_low_freq_.setValue(*processorRef.low_freq_, juce::dontSendNotification);
+    pimpl_->sl_high_freq_.setValue(*processorRef.high_freq_, juce::dontSendNotification);
+    pimpl_->sl_qfactor_.setValue(*processorRef.qfactor_, juce::dontSendNotification);
     
     pimpl_->sl_low_freq_.setSkewFactor(0.6);
     pimpl_->sl_high_freq_.setSkewFactor(0.6);
@@ -536,14 +536,40 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     
     pimpl_->lbl_low_freq_.setText ("Freq Lo", juce::NotificationType::dontSendNotification);
     pimpl_->lbl_high_freq_.setText("Freq Hi", juce::NotificationType::dontSendNotification);
-    pimpl_->lbl_qfactor_.setText  ("Q Factor", juce::NotificationType::dontSendNotification);
+    pimpl_->lbl_qfactor_.setText  ("Resonance", juce::NotificationType::dontSendNotification);
     
-    for(int i = 0, end = pimpl_->cmb_camera_list_.getNumItems(); i < end; ++i) {
-        if(pimpl_->openCamera(i)) {
-            pimpl_->cmb_camera_list_.setSelectedItemIndex(i, juce::NotificationType::dontSendNotification);
+    auto const num_cameras = pimpl_->cmb_camera_list_.getNumItems();
+    
+    // 保存されたカメラ番号
+    auto const try_first = std::clamp(processorRef.camera_index_.load(),
+                                      AP::kCameraIndexMin,
+                                      num_cameras);
+    
+    // カメラのオープンを試す順序を用意する。
+    // 保存されたカメラ番号を最初に試す。
+    // 一番最初にオープンできたカメラを使用する。
+    std::vector<int> camera_open_order;
+    camera_open_order.push_back(try_first);
+    for(int i = 0, end = num_cameras; i < end; ++i) {
+        if(i != try_first) { camera_open_order.push_back(i); }
+    }
+    
+    for(auto index: camera_open_order) {
+        if(pimpl_->openCamera(index)) {
+            pimpl_->cmb_camera_list_.setSelectedItemIndex(index,
+                                                          juce::NotificationType::dontSendNotification
+                                                          );
             break;
         }
     }
+    
+    processorRef.on_load_camera_index_ = [this](int index) {
+        index = std::clamp<int>(index,
+                                0,
+                                pimpl_->cmb_camera_list_.getNumItems());
+        
+        pimpl_->cmb_camera_list_.setSelectedItemIndex(index);
+    };
     
     getConstrainer()->setFixedAspectRatio((double)kMaxWidth / kMaxHeight);
     setBounds(0, 0, kDefaultWidth, kDefaultHeight);
@@ -554,6 +580,8 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
+    processorRef.on_load_camera_index_ = nullptr;
+    
     pimpl_->closeCamera();
     pimpl_->stopImageProcessingThread();
     pimpl_.reset();
@@ -711,7 +739,7 @@ void AudioPluginAudioProcessorEditor::OnUpdateMouthAspectRatio()
     double const mar = std::clamp(face_data.mar_.GetAverage(), kMarMin, kMarMax);
     double const freq = (mar - kMarMin) / (kMarMax - kMarMin);
     
-    auto *param = processor.getParameters()[AudioPluginAudioProcessor::Frequency];
+    auto *param = processorRef.freq_;
     param->setValueNotifyingHost(freq);
 
     repaint();
@@ -738,7 +766,7 @@ void AudioPluginAudioProcessorEditor::comboBoxChanged(juce::ComboBox *c)
     if(c == &pimpl_->cmb_camera_list_) {
         auto const item_index = c->getSelectedItemIndex();
         if(pimpl_->openCamera(item_index)) {
-            // do nothing.
+            processorRef.camera_index_ = item_index;
         } else {
             c->setSelectedId(0, juce::NotificationType::dontSendNotification);
         }

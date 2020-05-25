@@ -12,31 +12,30 @@ AudioPluginAudioProcessor::AudioPluginAudioProcessor()
                      #endif
                        )
 {
-    freq_ = new AudioParameterFloat("freq", "Frequency", { 0.0, 1.0 }, 0.0,
-                                    "Hz", AudioProcessorParameter::genericParameter,
-                                    [this](float value, int max_len) -> juce::String { return juce::String(paramToFreq(value)); },
-                                    [this](juce::String const &str) -> float {
-                                        try {
-                                            return freqToParam(std::stof(str.toRawUTF8()));
-                                        } catch(...) {
-                                            return 0.0;
-                                        }
-                                    }
-                                    );
+    addParameter(freq_ = new AudioParameterFloat("freq", "Frequency", { 0.0, 1.0 }, 0.0,
+                                                 "Hz", AudioProcessorParameter::genericParameter,
+                                                 [this](float value, int max_len) -> juce::String { return juce::String(paramToFreq(value)); },
+                                                 [this](juce::String const &str) -> float {
+                                                     try {
+                                                         return freqToParam(std::stof(str.toRawUTF8()));
+                                                     } catch(...) {
+                                                         return 0.0;
+                                                     }
+                                                 }
+                                                 ));
+                
+    addParameter(low_freq_ = new AudioParameterFloat("lowfreq", "Low Frequency Limit", { kLowFreqMin, kLowFreqMax }, kLowFreqDefault,
+                                                     "Hz", AudioProcessorParameter::genericParameter
+                                                     ));
     
-    low_freq_ = new AudioParameterFloat("lowfreq", "Low Frequency Limit", { kLowFreqMin, kLowFreqMax }, kLowFreqDefault,
-                                    "Hz", AudioProcessorParameter::genericParameter);
+    addParameter(high_freq_ = new AudioParameterFloat("highfreq", "High Frequency Limit", { kHighFreqMin, kHighFreqMax }, kHighFreqDefault,
+                                                      "Hz", AudioProcessorParameter::genericParameter
+                                                      ));
     
-    high_freq_ = new AudioParameterFloat("highfreq", "High Frequency Limit", { kHighFreqMin, kHighFreqMax }, kHighFreqDefault,
-                                    "Hz", AudioProcessorParameter::genericParameter);
-    
-    qfactor_ = new AudioParameterFloat("qfactor", "Q Factor", { kQFactorMin, kQFactorMax }, kQFactorDefault,
-                                    "Hz", AudioProcessorParameter::genericParameter);
-
-    addParameter(freq_);
-    addParameter(low_freq_);
-    addParameter(high_freq_);
-    addParameter(qfactor_);
+    addParameter(qfactor_ = new AudioParameterFloat("qfactor", "Q Factor", { kQFactorMin, kQFactorMax }, kQFactorDefault,
+                                                    "Hz", AudioProcessorParameter::genericParameter
+                                                    ));
+                
     sample_history_.reserve(kNumBins * 2);
 }
 
@@ -117,8 +116,11 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     juce::ignoreUnused (sampleRate, samplesPerBlock);
     
     last_freq_ = paramToFreq(0.0);
+    last_q_ = kQFactorDefault;
     smooth_freq_.setTargetValue(last_freq_);
-    smooth_freq_.reset(sampleRate, 4.0 / sampleRate);
+    smooth_freq_.reset(sampleRate, 2.0 / sampleRate);
+    smooth_q_.setTargetValue(last_q_);
+    smooth_q_.reset(sampleRate, 2.0 / sampleRate);
 
     filters_.resize(getTotalNumOutputChannels());
     std::fill(sample_history_.begin(), sample_history_.end(), 0.0);
@@ -172,14 +174,16 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     float const freq = paramToFreq(freq_->get());
     float const q = qfactor_->get();
     smooth_freq_.setTargetValue(freq);
+    smooth_q_.setTargetValue(q);
     
     //! 30 ms ずつ IIR フィルタの係数を更新する。
-    auto step = std::max<int>(1, (int)std::round(getSampleRate() * 30 / 1000.0));
+    auto step = std::max<int>(1, (int)std::round(getSampleRate() * 10 / 1000.0));
     for(int smp = 0, end = buffer.getNumSamples(); smp < end; smp += step) {
         auto const num_to_process = std::min<int>(step, end - smp);
         
         float const smoothed_freq = smooth_freq_.getNextValue();
-        if(freq != smoothed_freq) {
+        float const smoothed_q = smooth_q_.getNextValue();
+        if(freq != smoothed_freq || q != smoothed_q) {
             last_freq_ = smoothed_freq;
             
             auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, q);
@@ -231,6 +235,14 @@ void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
     juce::ignoreUnused (destData);
+    
+    auto xml = std::make_unique<XmlElement>("wahwth-root");
+    xml->setAttribute(freq_->paramID, (double)*freq_);
+    xml->setAttribute(low_freq_->paramID, (double)*low_freq_);
+    xml->setAttribute(high_freq_->paramID, (double)*high_freq_);
+    xml->setAttribute(qfactor_->paramID, (double)*qfactor_);
+    xml->setAttribute("camera", camera_index_.load());
+    copyXmlToBinary(*xml, destData);
 }
 
 void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
@@ -238,6 +250,21 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
     juce::ignoreUnused (data, sizeInBytes);
+    
+    auto xml = getXmlFromBinary(data, sizeInBytes);
+    if(xml == nullptr ||
+       xml->hasTagName("wahwth-root") == false)
+    { return; }
+
+    *freq_      = xml->getDoubleAttribute(freq_->paramID, kFrequencyDefault);
+    *low_freq_  = xml->getDoubleAttribute(low_freq_->paramID, kLowFreqDefault);
+    *high_freq_ = xml->getDoubleAttribute(high_freq_->paramID, kHighFreqDefault);
+    *qfactor_   = xml->getDoubleAttribute(qfactor_->paramID, kQFactorDefault);
+    camera_index_ = std::clamp<int>(xml->getIntAttribute("camera", 0), kCameraIndexMin, kCameraIndexMax);
+    
+    if(on_load_camera_index_) {
+        on_load_camera_index_(camera_index_.load());
+    }
 }
 
 void AudioPluginAudioProcessor::getSampleHistory(std::vector<float> &hist)

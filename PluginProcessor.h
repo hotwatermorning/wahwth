@@ -60,6 +60,12 @@ public:
     juce::AudioParameterFloat *high_freq_;
     juce::AudioParameterFloat *qfactor_;
     
+    // BPF のカットオフ周波数の位置パラメータの範囲
+    // カットオフ周波数の位置パラメータが実際にどの周波数になるかは、 LowFreq/HighFreq のパラメータの状態による。
+    static constexpr float kFrequencyMin = 0.0;
+    static constexpr float kFrequencyMax = 1.0;
+    static constexpr float kFrequencyDefault = 0.0;
+    
     static constexpr float kQFactorMin = 0.1;
     static constexpr float kQFactorMax = 7.0;
     static constexpr float kQFactorDefault = 5.0;
@@ -72,11 +78,22 @@ public:
     static constexpr float kHighFreqMax = 7500;
     static constexpr float kHighFreqDefault = 6000;
     
+    static constexpr int kCameraIndexMin = 0;
+    static constexpr int kCameraIndexMax = 127;
+    
+    //! カメラ番号
+    std::atomic<int> camera_index_ = kCameraIndexMin;
+
+    //! カメラ番号を読み込んだときに呼び出されるコールバック
+    std::function<void(int)> on_load_camera_index_;
+    
     std::array<float, NumParams> parameters_;
 
     std::vector<juce::IIRFilter> filters_;
     float last_freq_;
+    float last_q_;
     juce::SmoothedValue<float> smooth_freq_;
+    juce::SmoothedValue<float> smooth_q_;
     
     static constexpr int kOrder = 8;
     static constexpr int kNumBins = 1 << kOrder;
