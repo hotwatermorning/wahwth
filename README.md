@@ -7,8 +7,7 @@ This is a Wah-Wah effector audio plugin which can be manipulated with your mouth
 
 ## Requirements
 
-* OpenCV (4.3 or later)
-* dlib (693aa0a7 or later)
+* dlib
 
 ## How to build
 

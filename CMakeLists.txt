@@ -19,7 +19,6 @@ cmake_minimum_required(VERSION 3.15)
 
 project(Wahwth_Plugin VERSION 0.0.1)
 
-find_package(OpenCV REQUIRED)
 find_package(dlib REQUIRED)
 
 # If you've installed JUCE somehow (via a package manager, or directly using the CMake install
@@ -44,7 +43,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/juce)                    # If y
 # Check the readme at `examples/CMake` in the JUCE repo for the full list.
 
 juce_add_plugin(Wahwth
-    VERSION 0.9.0                               # Set this if the plugin version is different to the project version
+    VERSION 0.9.1                               # Set this if the plugin version is different to the project version
     # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
     # ICON_SMALL ...
     COMPANY_NAME "diatonic.jp"                  # Specify the name of the plugin's author
@@ -125,11 +124,9 @@ target_link_libraries(Wahwth PRIVATE
     juce::juce_gui_extra
     juce::juce_video
     juce::juce_dsp
-    ${OpenCV_LIBS}
     dlib::dlib
     )
 
 target_include_directories(Wahwth PUBLIC 
-    ${OpenCV_INCLUDE_DIRS}
     dlib::dlib
     )

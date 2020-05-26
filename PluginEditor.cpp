@@ -2,11 +2,11 @@
 #include "PluginEditor.h"
 #include "AboutDialog.h"
 #include <algorithm>
-#include <opencv4/opencv2/opencv.hpp>
 #include <dlib/image_processing/frontal_face_detector.h>
 #include <dlib/image_io.h>
 #include <dlib/image_processing.h>
-#include <dlib/opencv/cv_image.h>
+
+#define WAHWTH_USE_IMAGE_PROCESSING_THREAD 1
 
 bool kShowFace = true;
 
@@ -16,6 +16,96 @@ int const kMaxWidth = 1200;
 int const kMaxHeight = 900;
 int const kDefaultWidth = 600;
 int const kDefaultHeight = 450;
+
+template<class PixelType>
+struct dlib_pixel_type_to_juce_pixel_format;
+
+template<>
+struct dlib_pixel_type_to_juce_pixel_format<dlib::rgb_pixel>
+{
+    static constexpr juce::Image::PixelFormat pixel_format
+    = juce::Image::PixelFormat::RGB;
+};
+
+template<>
+struct dlib_pixel_type_to_juce_pixel_format<dlib::rgb_alpha_pixel>
+{
+    static constexpr juce::Image::PixelFormat pixel_format
+    = juce::Image::PixelFormat::ARGB;
+};
+
+template<class PixelType>
+struct JuceImageArray2d
+{
+    using pixel_type = PixelType;
+    
+    JuceImageArray2d(juce::Image img)
+    {
+        assert(img.isValid());
+        assert(img.getPixelData()->pixelFormat
+               == dlib_pixel_type_to_juce_pixel_format<PixelType>::pixel_format);
+        img_ = img;
+    }
+    
+    void swap(JuceImageArray2d &rhs)
+    {
+        std::swap(img_, rhs.img_);
+    }
+    
+public:
+    juce::Image img_;
+};
+
+template<class PixelType>
+long        num_rows      (const JuceImageArray2d<PixelType>& img)
+{
+    return img.img_.getHeight();
+}
+
+template<class PixelType>
+long        num_columns   (const JuceImageArray2d<PixelType>& img)
+{
+    return img.img_.getWidth();
+}
+
+// not supported.
+// void        set_image_size(      JuceImageArray2d& img, long rows, long cols);
+
+template<class PixelType>
+void*       image_data    (      JuceImageArray2d<PixelType>& img)
+{
+    auto bmp = juce::Image::BitmapData(img.img_, juce::Image::BitmapData::readWrite);
+    return bmp.data;
+}
+
+template<class PixelType>
+const void* image_data    (const JuceImageArray2d<PixelType>& img)
+{
+    auto bmp = juce::Image::BitmapData(img.img_, juce::Image::BitmapData::readOnly);
+    return bmp.data;
+}
+
+template<class PixelType>
+long        width_step    (const JuceImageArray2d<PixelType>& img)
+{
+    auto bmp = juce::Image::BitmapData(img.img_, juce::Image::BitmapData::readOnly);
+    return bmp.lineStride;
+}
+
+template<class PixelType>
+void        swap          (      JuceImageArray2d<PixelType>& a, JuceImageArray2d<PixelType>& b)
+{
+    a.swap(b);
+}
+
+namespace dlib
+{
+    template <class PixelType>
+    struct image_traits<JuceImageArray2d<PixelType>>
+    {
+        typedef typename JuceImageArray2d<PixelType>::pixel_type pixel_type;
+    };
+}
 
 template<class T = void>
 struct default_div
@@ -242,9 +332,7 @@ public:
     juce::Label lbl_qfactor_;
     
 private:
-    std::mutex mutable camera_mtx_; //!< カメラスレッドと画像処理スレッドの排他制御
     std::mutex mutable gui_mtx_;    //!< GUI スレッドと画像処理スレッドの排他制御
-    juce::Image tmp_image_;         //!< camera から取得した画像を、画像処理スレッドで処理するために保持しておく変数
         
     std::vector<float> fft_buffer_;
     std::unique_ptr<juce::dsp::FFT> fft_;
@@ -285,144 +373,154 @@ private:
         return mar;
     }
     
+    struct ImageProcessingContext {
+        ImageProcessingContext()
+        {
+            detector = dlib::get_frontal_face_detector();
+
+            std::string tmp(BinaryData::shape_predictor_68_face_landmarks_dat,
+                           BinaryData::shape_predictor_68_face_landmarks_dat
+                           + BinaryData::shape_predictor_68_face_landmarks_datSize
+                           );
+
+            std::stringstream ss(tmp);
+            dlib::deserialize(predictor, ss);
+
+            tmp_mouth_points.resize(kNumMouthPoints);
+            set_image_size(tmp_array, kDefaultHeight, kDefaultWidth);
+        }
+        
+        dlib::frontal_face_detector detector;
+        dlib::shape_predictor predictor;
+
+        std::vector<dlib::point> tmp_mouth_points;
+        dlib::array2d<unsigned char> tmp_array;
+    };
+    
+    ImageProcessingContext context_;
+    
+    //! camera から取得した画像を、画像処理スレッドで処理するために保持しておく変数
+    juce::Image tmp_image_;
+    
+    bool ProcessImage(juce::Image img, ImageProcessingContext &ctx)
+    {
+        static bool write_image = false;
+        auto get_desktop_file = [](juce::String const &filename) {
+            return juce::File::getSpecialLocation(juce::File::userDesktopDirectory).getChildFile(filename);
+        };
+        
+        if(write_image) {
+            juce::PNGImageFormat fmt;
+            juce::File file = get_desktop_file("original_image.png");
+            auto fs = file.createOutputStream();
+            fmt.writeImageToStream(img, *fs);
+            fs.reset();
+        }
+        
+        // expected image ascpected ratio
+        double const ar = (double)kDefaultWidth / kDefaultHeight;
+        
+        auto const actual_w = img.getWidth();
+        auto const expected_w = (int)std::round(img.getHeight() * ar);
+        
+        auto const DW = kDefaultWidth;
+        auto const DH = kDefaultHeight;
+        
+        if(actual_w == expected_w) {
+            // do nothing.
+        } else if(actual_w > expected_w) {
+            // 画面が横長なので左右を捨てる。
+            int const nx = actual_w - expected_w;
+            auto rect = img.getBounds().reduced(nx / 2.0, 0);
+            img = img.getClippedImage(rect);
+        } else {
+            // 画面が縦長なので上下を捨てる。
+             int const ny = img.getHeight() - (img.getWidth() / ar);
+             auto rect = img.getBounds().reduced(0, ny / 2.0);
+             img = img.getClippedImage(rect);
+        }
+         
+        img = img.rescaled(kDefaultWidth, kDefaultHeight);
+        img.desaturate();
+
+        if(write_image) {
+            juce::PNGImageFormat fmt;
+            juce::File file = get_desktop_file("juce_image.png");
+            auto fs = file.createOutputStream();
+            fmt.writeImageToStream(img, *fs);
+            fs.reset();
+        }
+        
+        if(img.getPixelData()->pixelFormat == juce::Image::PixelFormat::RGB) {
+            dlib::assign_image(ctx.tmp_array, JuceImageArray2d<dlib::rgb_pixel>(img));
+        } else {
+            dlib::assign_image(ctx.tmp_array, JuceImageArray2d<dlib::rgb_alpha_pixel>(img));
+        }
+        
+        if(write_image) {
+            dlib::save_png(ctx.tmp_array, get_desktop_file("dlib_image.png").getFullPathName().toStdString());
+        }
+        
+        auto rects = ctx.detector(ctx.tmp_array, 0);
+        
+        FaceData tmp_face_data = getFaceData();
+                    
+        if(rects.empty()) {
+            tmp_face_data.num_skipped_ += 1;
+            if(kShowFace) {
+                tmp_face_data.image_ = std::move(img);
+            }
+            
+            setFaceData(tmp_face_data);
+        } else {
+            dlib::full_object_detection shape = ctx.predictor(ctx.tmp_array, rects[0]);
+
+            for(int i = 0, end = kNumMouthPoints; i < end; ++i) {
+                ctx.tmp_mouth_points[i] = shape.part(i + kMouthPointsBegin);
+            }
+            
+            double const tmp_mar = getMouthAspectRatio(ctx.tmp_mouth_points);
+            
+            for(int i = 0, end = kNumMouthPoints; i < end; ++i) {
+                tmp_face_data.mouth_points_[i].Push(ctx.tmp_mouth_points[i]);
+            }
+
+            tmp_face_data.mar_.Push(tmp_mar);
+            tmp_face_data.num_processed_ += 1;
+            tmp_face_data.num_skipped_ = 0;
+            
+            if(kShowFace) {
+                tmp_face_data.image_ = std::move(img);
+            }
+            
+            setFaceData(tmp_face_data);
+        }
+    }
+    
     void run() override
     {
-        auto detector = dlib::get_frontal_face_detector();
-        dlib::shape_predictor predictor;
- 
-        std::string tmp(BinaryData::shape_predictor_68_face_landmarks_dat,
-                        BinaryData::shape_predictor_68_face_landmarks_dat
-                        + BinaryData::shape_predictor_68_face_landmarks_datSize
-                        );
-        
-        std::stringstream ss(tmp);
-        dlib::deserialize(predictor, ss);
-        
-        std::vector<dlib::point> tmp_mouth_points(kNumMouthPoints);
-        cv::Mat tmp_mat;
+        int continue_count_ = 0;
         
         for( ; threadShouldExit() == false; ) {
             
-            juce::Image tmp_image;
-                       
-            {
-                std::unique_lock lock(camera_mtx_);
-                tmp_image = std::move(tmp_image_);
-            }
+            juce::Image tmp_image = std::move(tmp_image_);
             
             if(tmp_image.isValid() == false) {
-                sleep(10);
+                continue_count_ += 1;
+                if(continue_count_ < 10) {
+                    // do nothing.
+                } else if(continue_count_ < 30) {
+                    std::this_thread::yield();
+                } else {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+                
                 continue;
             }
             
-            static bool write_image_ = false;
-            
-            if(write_image_) {
-                juce::PNGImageFormat fmt;
-                juce::File file("/Users/yuasa/Desktop/juce_image_original.png");
-                auto fs = file.createOutputStream();
-                fmt.writeImageToStream(tmp_image, *fs);
-                fs.reset();
-            }
-            
-            // expected image ascpected ratio
-            double const ar = (double)kDefaultWidth / kDefaultHeight;
-            
-            auto const actual_w = tmp_image.getWidth();
-            auto const expected_w = (int)std::round(tmp_image.getHeight() * ar);
-            
-            auto const DW = kDefaultWidth;
-            auto const DH = kDefaultHeight;
-            
-            if(actual_w == expected_w) {
-                // do nothing.
-            } else if(actual_w > expected_w) {
-                // 画面が横長なので左右を捨てる。
-                int const nx = actual_w - expected_w;
-                auto rect = tmp_image.getBounds().reduced(nx / 2.0, 0);
-                tmp_image = tmp_image.getClippedImage(rect);
-            } else {
-                // 画面が縦長なので上下を捨てる。
-                 int const ny = tmp_image.getHeight() - (tmp_image.getWidth() / ar);
-                 auto rect = tmp_image.getBounds().reduced(0, ny / 2.0);
-                 tmp_image = tmp_image.getClippedImage(rect);
-            }
-             
-            auto rescaled = tmp_image.rescaled(kDefaultWidth, kDefaultHeight);
-
-            if(write_image_) {
-                juce::PNGImageFormat fmt;
-                juce::File file("/Users/yuasa/Desktop/juce_image.png");
-                auto fs = file.createOutputStream();
-                fmt.writeImageToStream(rescaled, *fs);
-                fs.reset();
-            }
-            
-            juce::Image::BitmapData bmp_rescaled(rescaled, juce::Image::BitmapData::readWrite);
-            
-            cv::Mat mat_rescaled;
-            
-            if(rescaled.getPixelData()->pixelFormat == juce::Image::PixelFormat::RGB) {
-                mat_rescaled = cv::Mat(DH, DW, CV_8UC3, bmp_rescaled.data);
-            } else if(rescaled.getPixelData()->pixelFormat == juce::Image::PixelFormat::ARGB) {
-                mat_rescaled = cv::Mat(DH, DW, CV_8UC4, bmp_rescaled.data);
-            } else {
-                return;
-            }
-            
-            
-            if(write_image_) {
-                cv::imwrite("/Users/yuasa/Desktop/cv_rescaled.png", mat_rescaled);
-            }
-            
-            cv::cvtColor(mat_rescaled,
-                         tmp_mat,
-                         cv::COLOR_RGBA2GRAY
-                         );
-            
-            auto img = dlib::cv_image<unsigned char>(tmp_mat);
-            
-            auto rects = detector(img, 0);
-            
-            FaceData tmp_face_data = getFaceData();
-            
-            if(kShowFace) {
-                cv::cvtColor(tmp_mat,
-                             mat_rescaled,
-                             cv::COLOR_GRAY2RGBA
-                             );
-            }
-            
-            if(rects.empty()) {
-                tmp_face_data.num_skipped_ += 1;
-                if(kShowFace) {
-                    tmp_face_data.image_ = std::move(rescaled);
-                }
-                
-                setFaceData(tmp_face_data);
-            } else {
-                dlib::full_object_detection shape = predictor(img, rects[0]);
-
-                for(int i = 0, end = kNumMouthPoints; i < end; ++i) {
-                    tmp_mouth_points[i] = shape.part(i + kMouthPointsBegin);
-                }
-                
-                double const tmp_mar = getMouthAspectRatio(tmp_mouth_points);
-                
-                for(int i = 0, end = kNumMouthPoints; i < end; ++i) {
-                    tmp_face_data.mouth_points_[i].Push(tmp_mouth_points[i]);
-                }
-
-                tmp_face_data.mar_.Push(tmp_mar);
-                tmp_face_data.num_processed_ += 1;
-                tmp_face_data.num_skipped_ = 0;
-                
-                if(kShowFace) {
-                    tmp_face_data.image_ = std::move(rescaled);
-                }
-                
-                setFaceData(tmp_face_data);
-            }
+            continue_count_ = 0;
+                        
+            ProcessImage(tmp_image, context_);
             
             auto mm = juce::MessageManager::getInstance();
             mm->callAsync([this, w = std::weak_ptr<std::mutex>(mtx_call_async_)] {
@@ -449,8 +547,16 @@ private:
 
     void imageReceived(juce::Image const &image) override
     {
-        std::unique_lock lock(camera_mtx_);
+#if WAHWTH_USE_IMAGE_PROCESSING_THREAD
         tmp_image_ = image;
+#else
+        ProcessImage(image, context_);
+        
+        auto mm = juce::MessageManager::getInstance();
+        mm->callAsync([this] {
+            owner_->OnUpdateMouthAspectRatio();
+        });
+#endif
     }
 };
 
@@ -578,7 +684,9 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     setBounds(0, 0, kDefaultWidth, kDefaultHeight);
     resized();
     
+#if WAHWTH_USE_IMAGE_PROCESSING_THREAD
     pimpl_->startImageProcessingThread();
+#endif
 }
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
@@ -586,7 +694,11 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
     processorRef.on_load_camera_index_ = nullptr;
     
     pimpl_->closeCamera();
+    
+#if WAHWTH_USE_IMAGE_PROCESSING_THREAD
     pimpl_->stopImageProcessingThread();
+#endif
+    
     pimpl_.reset();
 }
 
