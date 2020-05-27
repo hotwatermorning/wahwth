@@ -402,7 +402,7 @@ private:
     //! camera から取得した画像を、画像処理スレッドで処理するために保持しておく変数
     juce::Image tmp_image_;
     
-    bool ProcessImage(juce::Image img, ImageProcessingContext &ctx)
+    void ProcessImage(juce::Image img, ImageProcessingContext &ctx)
     {
         static bool write_image = false;
         auto get_desktop_file = [](juce::String const &filename) {

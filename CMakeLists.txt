@@ -130,3 +130,8 @@ target_link_libraries(Wahwth PRIVATE
 target_include_directories(Wahwth PUBLIC 
     dlib::dlib
     )
+
+target_compile_options(Wahwth
+    PUBLIC
+    -Werror=return-type
+    )
