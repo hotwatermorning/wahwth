@@ -10,6 +10,7 @@
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(DLIB_NO_GUI_SUPPORT YES)
 
 cmake_minimum_required(VERSION 3.15)
 
@@ -19,8 +20,6 @@ cmake_minimum_required(VERSION 3.15)
 
 project(Wahwth_Plugin VERSION 0.0.1)
 
-find_package(dlib REQUIRED)
-
 # If you've installed JUCE somehow (via a package manager, or directly using the CMake install
 # target), you'll need to tell this project that it depends on the installed copy of JUCE. If you've
 # included JUCE directly in your source tree (perhaps as a submodule), you'll need to tell CMake to
@@ -29,6 +28,7 @@ find_package(dlib REQUIRED)
 # find_package(JUCE CONFIG REQUIRED)        # If you've installed JUCE to your system
 # or
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/juce)                    # If you've put JUCE in a subdirectory called JUCE
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/dlib)
 
 # If you are building a VST2 or AAX plugin, CMake needs to be told where to find these SDKs on your
 # system. This setup should be done before calling `juce_add_plugin`.
