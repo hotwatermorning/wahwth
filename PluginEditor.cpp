@@ -16,6 +16,8 @@ int const kMaxWidth = 1200;
 int const kMaxHeight = 900;
 int const kDefaultWidth = 600;
 int const kDefaultHeight = 450;
+int const kProcessImageWidth = kDefaultWidth / 2;
+int const kProcessImageHeight = kDefaultHeight / 2;
 
 template<class PixelType>
 struct dlib_pixel_type_to_juce_pixel_format;
@@ -393,7 +395,7 @@ private:
             dlib::deserialize(predictor, ifs);
 
             tmp_mouth_points.resize(kNumMouthPoints);
-            set_image_size(tmp_array, kDefaultHeight, kDefaultWidth);
+            set_image_size(tmp_array, kProcessImageHeight, kProcessImageWidth);
         }
         
         dlib::frontal_face_detector detector;
@@ -429,9 +431,6 @@ private:
         auto const actual_w = img.getWidth();
         auto const expected_w = (int)std::round(img.getHeight() * ar);
         
-        auto const DW = kDefaultWidth;
-        auto const DH = kDefaultHeight;
-        
         if(actual_w == expected_w) {
             // do nothing.
         } else if(actual_w > expected_w) {
@@ -445,8 +444,8 @@ private:
              auto rect = img.getBounds().reduced(0, ny / 2.0);
              img = img.getClippedImage(rect);
         }
-         
-        img = img.rescaled(kDefaultWidth, kDefaultHeight);
+        
+        img = img.rescaled(kProcessImageWidth, kProcessImageHeight);
         img.desaturate();
 
         if(write_image) {
