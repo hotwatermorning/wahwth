@@ -463,9 +463,11 @@ private:
             dlib::assign_image(ctx.tmp_array, JuceImageArray2d<dlib::rgb_alpha_pixel>(img));
         }
         
+#ifdef DLIB_PNG_SUPPORT
         if(write_image) {
             dlib::save_png(ctx.tmp_array, get_desktop_file("dlib_image.png").getFullPathName().toStdString());
         }
+#endif
         
         auto rects = ctx.detector(ctx.tmp_array, 0);
         
