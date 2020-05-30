@@ -164,13 +164,13 @@ else()
         TARGET Wahwth
         POST_BUILD
         COMMAND echo mkdir for standalone
-        COMMAND mkdir -p "\"${BINARY_DIR}/Standalone\""
+        COMMAND mkdir -p "\"${BINARY_DIR}/Standalone/Wahwth.app/Contents/Resources\""
         COMMAND echo mkdir for VST3
         COMMAND mkdir -p "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
         COMMAND echo mkdir for AU
         COMMAND mkdir -p "\"${BINARY_DIR}/AU/Wahwth.component/Contents/Resources/\""
         COMMAND echo copy the landmarkfile for standalone
-        COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/Standalone\""
+        COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/Standalone/Wahwth.app/Contents/Resources\""
         COMMAND echo copy the landmarkfile for VST3
         COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
         COMMAND echo copy the landmarkfile for AU
