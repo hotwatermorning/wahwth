@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
