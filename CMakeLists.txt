@@ -10,6 +10,7 @@
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
+set(DLIB_NO_GUI_SUPPORT YES)
 
 cmake_minimum_required(VERSION 3.15)
 
@@ -19,8 +20,6 @@ cmake_minimum_required(VERSION 3.15)
 
 project(Wahwth_Plugin VERSION 0.0.1)
 
-find_package(dlib REQUIRED)
-
 # If you've installed JUCE somehow (via a package manager, or directly using the CMake install
 # target), you'll need to tell this project that it depends on the installed copy of JUCE. If you've
 # included JUCE directly in your source tree (perhaps as a submodule), you'll need to tell CMake to
@@ -29,6 +28,7 @@ find_package(dlib REQUIRED)
 # find_package(JUCE CONFIG REQUIRED)        # If you've installed JUCE to your system
 # or
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/juce)                    # If you've put JUCE in a subdirectory called JUCE
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/dlib)
 
 # If you are building a VST2 or AAX plugin, CMake needs to be told where to find these SDKs on your
 # system. This setup should be done before calling `juce_add_plugin`.
@@ -108,9 +108,9 @@ target_compile_definitions(Wahwth
 # static library. These source files can be of any kind (wav data, images, fonts, icons etc.).
 # Conversion to binary-data will happen when your target is built.
 
-juce_add_binary_data(AudioPluginData SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/shape_predictor_68_face_landmarks.dat
-    )
+# juce_add_binary_data(AudioPluginData SOURCES
+#     ${CMAKE_CURRENT_SOURCE_DIR}/shape_predictor_68_face_landmarks.dat
+#     )
 
 # `target_link_libraries` links libraries and JUCE modules to other libraries or executables. Here,
 # we're linking our executable target to the `juce::juce_audio_utils` module. Inter-module
@@ -119,7 +119,7 @@ juce_add_binary_data(AudioPluginData SOURCES
 # here too. This is a standard CMake command.
 
 target_link_libraries(Wahwth PRIVATE
-    AudioPluginData           # If we'd created a binary data target, we'd link to it here
+    # AudioPluginData           # If we'd created a binary data target, we'd link to it here
     juce::juce_audio_utils
     juce::juce_gui_extra
     juce::juce_video
@@ -127,6 +127,54 @@ target_link_libraries(Wahwth PRIVATE
     dlib::dlib
     )
 
-target_include_directories(Wahwth PUBLIC 
+target_include_directories(Wahwth
+    PUBLIC
     dlib::dlib
     )
+
+target_compile_options(Wahwth
+    PUBLIC
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Werror=return-type>
+    $<$<CXX_COMPILER_ID:MSVC>:/source-charset:utf-8>
+    )
+
+set(LANDMARK_FILE "${CMAKE_CURRENT_SOURCE_DIR}/shape_predictor_68_face_landmarks.dat")
+set(BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/Wahwth_artefacts/$<CONFIG>")
+
+if(MSVC)
+    # copy command can't treat slash as a path separator unlike cd command.
+    string(REGEX REPLACE "/" "\\\\" LANDMARK_FILE "${LANDMARK_FILE}")
+    string(REGEX REPLACE "/" "\\\\" BINARY_DIR "${BINARY_DIR}")
+
+    add_custom_command(
+        TARGET Wahwth
+        POST_BUILD
+        COMMAND echo mkdir for standalone
+        COMMAND mkdir "\"${BINARY_DIR}\\Standalone\"" & cmd /c exit 0
+        COMMAND echo mkdir for VST3
+        COMMAND mkdir "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\"" & cmd /c exit 0
+        COMMAND echo copy the landmark file for standalone
+        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\\""
+        COMMAND echo copy the landmark file for VST3
+        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\\\""
+        COMMENT "Deploy the landmark file."
+        )
+else()
+    add_custom_command(
+        TARGET Wahwth
+        POST_BUILD
+        COMMAND echo mkdir for standalone
+        COMMAND mkdir -p "\"${BINARY_DIR}/Standalone/Wahwth.app/Contents/Resources\""
+        COMMAND echo mkdir for VST3
+        COMMAND mkdir -p "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
+        COMMAND echo mkdir for AU
+        COMMAND mkdir -p "\"${BINARY_DIR}/AU/Wahwth.component/Contents/Resources/\""
+        COMMAND echo copy the landmarkfile for standalone
+        COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/Standalone/Wahwth.app/Contents/Resources\""
+        COMMAND echo copy the landmarkfile for VST3
+        COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
+        COMMAND echo copy the landmarkfile for AU
+        COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/AU/Wahwth.component/Contents/Resources/\""
+        COMMENT "Deploy the landmark file."
+        )
+endif()

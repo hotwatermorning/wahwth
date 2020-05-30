@@ -378,13 +378,19 @@ private:
         {
             detector = dlib::get_frontal_face_detector();
 
-            std::string tmp(BinaryData::shape_predictor_68_face_landmarks_dat,
-                           BinaryData::shape_predictor_68_face_landmarks_dat
-                           + BinaryData::shape_predictor_68_face_landmarks_datSize
-                           );
+            juce::File executable_dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
+            juce::File landmark_file = executable_dir.getChildFile("shape_predictor_68_face_landmarks.dat");
+            if(landmark_file.existsAsFile() == false) {
+                landmark_file = executable_dir.getParentDirectory().getChildFile("Resources/shape_predictor_68_face_landmarks.dat");
+            }
 
-            std::stringstream ss(tmp);
-            dlib::deserialize(predictor, ss);
+#if JUCE_WINDOWS
+            std::ifstream ifs(landmark_file.getFullPathName().toWideCharPointer(), std::ios::binary | std::ios::in);
+#else
+            std::ifstream ifs(landmark_file.getFullPathName().toUTF8(), std::ios::binary | std::ios::in);
+#endif
+
+            dlib::deserialize(predictor, ifs);
 
             tmp_mouth_points.resize(kNumMouthPoints);
             set_image_size(tmp_array, kDefaultHeight, kDefaultWidth);
@@ -402,7 +408,7 @@ private:
     //! camera から取得した画像を、画像処理スレッドで処理するために保持しておく変数
     juce::Image tmp_image_;
     
-    bool ProcessImage(juce::Image img, ImageProcessingContext &ctx)
+    void ProcessImage(juce::Image img, ImageProcessingContext &ctx)
     {
         static bool write_image = false;
         auto get_desktop_file = [](juce::String const &filename) {
@@ -648,30 +654,31 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     pimpl_->lbl_qfactor_.setText  ("Resonance", juce::NotificationType::dontSendNotification);
     
     auto const num_cameras = pimpl_->cmb_camera_list_.getNumItems();
-    
-    // 保存されたカメラ番号
-    auto const try_first = std::clamp(processorRef.camera_index_.load(),
-                                      AP::kCameraIndexMin,
-                                      num_cameras);
-    
-    // カメラのオープンを試す順序を用意する。
-    // 保存されたカメラ番号を最初に試す。
-    // 一番最初にオープンできたカメラを使用する。
-    std::vector<int> camera_open_order;
-    camera_open_order.push_back(try_first);
-    for(int i = 0, end = num_cameras; i < end; ++i) {
-        if(i != try_first) { camera_open_order.push_back(i); }
-    }
-    
-    for(auto index: camera_open_order) {
-        if(pimpl_->openCamera(index)) {
-            pimpl_->cmb_camera_list_.setSelectedItemIndex(index,
-                                                          juce::NotificationType::dontSendNotification
-                                                          );
-            break;
+    if(num_cameras != 0) {
+        // 保存されたカメラ番号
+        auto const try_first = std::clamp(processorRef.camera_index_.load(),
+                                          AP::kCameraIndexMin,
+                                          num_cameras);
+
+        // カメラのオープンを試す順序を用意する。
+        // 保存されたカメラ番号を最初に試す。
+        // 一番最初にオープンできたカメラを使用する。
+        std::vector<int> camera_open_order;
+        camera_open_order.push_back(try_first);
+        for(int i = 0, end = num_cameras; i < end; ++i) {
+            if(i != try_first) { camera_open_order.push_back(i); }
+        }
+
+        for(auto index : camera_open_order) {
+            if(pimpl_->openCamera(index)) {
+                pimpl_->cmb_camera_list_.setSelectedItemIndex(index,
+                                                              juce::NotificationType::dontSendNotification
+                                                              );
+                break;
+            }
         }
     }
-    
+
     processorRef.on_load_camera_index_ = [this](int index) {
         index = std::clamp<int>(index,
                                 0,

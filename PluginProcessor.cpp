@@ -1,3 +1,5 @@
+#include <cassert>
+
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
@@ -304,6 +306,7 @@ float AudioPluginAudioProcessor::freqToParam(float freq) const
     double const param = log_with_base(max_ / min_, (freq / min_));
     
     assert(0 <= param && param <= 1.0);
+    return param;
 }
 
 //==============================================================================
