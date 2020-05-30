@@ -231,7 +231,7 @@ struct AudioPluginAudioProcessorEditor::Impl
     
     struct FaceData
     {
-        using MouthPointArray = std::array<MovingAverageValue<dlib::point>, kNumMouthPoints>;
+        using MouthPointArray = std::array<MovingAverageValue<dlib::dpoint>, kNumMouthPoints>;
         juce::Image image_;             //!< エディター画面で表示するカメラ画像
         MouthPointArray mouth_points_;  //!< エディター画面で表示する口の輪郭
         MovingAverageValue<double> mar_;
@@ -358,9 +358,9 @@ private:
         face_data_ = fd;
     }
     
-    double getMouthAspectRatio(std::vector<dlib::point> const &points)
+    double getMouthAspectRatio(std::vector<dlib::dpoint> const &points)
     {
-        auto distance = [](dlib::point pt1, dlib::point pt2) {
+        auto distance = [](dlib::dpoint pt1, dlib::dpoint pt2) {
             auto const x = pt2.x() - pt1.x();
             auto const y = pt2.y() - pt1.y();
             return std::sqrt(x * x + y * y);
@@ -401,7 +401,7 @@ private:
         dlib::frontal_face_detector detector;
         dlib::shape_predictor predictor;
 
-        std::vector<dlib::point> tmp_mouth_points;
+        std::vector<dlib::dpoint> tmp_mouth_points;
         dlib::array2d<unsigned char> tmp_array;
     };
     
