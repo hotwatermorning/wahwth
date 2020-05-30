@@ -33,7 +33,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: wahwth-release-win.zip
-        path: build/Wahwth_artefacts/wahwhth-release-win.zip
+        path: build/Wahwth_artefacts/wahwth-release-win.zip
   build_mac:
     runs-on: macos-latest
     steps:
