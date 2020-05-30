@@ -10,19 +10,11 @@ on:
   pull_request:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build_win:
-    # The type of runner that the job will run on
     runs-on: windows-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-
-    # Runs a single command using the runners shell
     - name: Prepare Project
       run: |
         git submodule update --init --recursive
@@ -34,21 +26,18 @@ jobs:
         cd build
         cmake --build . --config Release
     - name: Archive
-      uses: TheDoctor0/zip-release@v0.3.0
+      run: |
+        cd build/Wahwth_artefacts/Release
+        Compress-Archive -Path .\* -DestinationPath ..\wahwth-release-win.zip
+    - name: Upload
+      uses: actions/upload-artifact@v2
       with:
-        filename: "Archive-Win.zip"
-        path: build/Wahwth_artefacts/Release
-        directory: build/Wahwth_artefacts
+        name: wahwth-release-win.zip
+        path: build/Wahwth_artefacts/wahwhth-release-win.zip
   build_mac:
-        # The type of runner that the job will run on
     runs-on: macos-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
-
-    # Runs a single command using the runners shell
     - name: Prepare Project
       run: |
         git submodule update --init --recursive
@@ -60,8 +49,46 @@ jobs:
         cd build
         cmake --build . --config Release
     - name: Archive
-      uses: TheDoctor0/zip-release@v0.3.0
+      run: |
+        cd build/Wahwth_artefacts/Release
+        zip -r ../wahwth-release-mac.zip
+    - name: Upload
+      uses: actions/upload-artifact@v2
       with:
-        filename: "Archive-Mac.zip"
-        path: build/Wahwth_artefacts/Release
-        directory: build/Wahwth_artefacts
+        name: wahwth-release-mac.zip
+        path: build/Wahwth_artefacts/wahwth-release-mac.zip
+  release:
+    needs: [build_win, build_mac]
+    runs-on: macos-latest
+    steps:
+    - name: Create a Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        draft: true
+    - name: Download (Win)
+      uses: actions/download-artifact@v2
+      with:
+        name: wahwth-release-win.zip
+    - name: Download (Mac)
+      uses: actions/download-artifact@v2
+      with:
+        name: wahwth-release-mac.zip
+    - name: Upload Release Archives (Win)
+      uses: actions/upload-release-asset@v1.0.2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./wahwth-release-win.zip
+        asset_name: wahwth-release-win.zip
+        asset_content_type: application/zip
+    - name: Upload Release Archives (Mac)
+      uses: actions/upload-release-asset@v1.0.2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./wahwth-release-mac.zip
+        asset_name: wahwth-release-mac.zip
+        asset_content_type: application/zip
