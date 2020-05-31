@@ -119,6 +119,7 @@ void AudioPluginAudioProcessor::prepareToPlay (double sampleRate, int samplesPer
     
     last_freq_ = -1;
     last_q_ = -1;
+    last_qfactor_gain_ = 1.0;
     smooth_freq_.setTargetValue(last_freq_);
     smooth_freq_.reset(sampleRate, 2.0 / sampleRate);
     smooth_q_.setTargetValue(last_q_);
@@ -177,6 +178,7 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     float const q = qfactor_->get();
     smooth_freq_.setTargetValue(freq);
     smooth_q_.setTargetValue(q);
+    double qfactor_gain = last_qfactor_gain_;
     
     //! 30 ms ずつ IIR フィルタの係数を更新する。
     auto step = std::max<int>(1, (int)std::round(getSampleRate() * 10 / 1000.0));
@@ -189,17 +191,33 @@ void AudioPluginAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer,
             last_freq_ = smoothed_freq;
             last_q_ = smoothed_q;
             
-            auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, q);
+            //! 正しい方法がわかっていないので適当
+            auto get_qfactor_adjustment_gain = [](double qfactor) {
+                // q_factor が 0に近いときは 1.0 倍、それより大きいときはそれに合わせて gain adjustment を増やす。
+                // 0 に近いときのほうが変化率が大きいようにする。
+                // q_factor が最大のとき音量を 6.0 倍まで増幅する
+                
+                double scaled_q = qfactor / kQFactorMax * std::log(1/6.0);
+                return 1.0 / exp(scaled_q);
+            };
+            
+            auto const coeff = juce::IIRCoefficients::makeBandPass(getSampleRate(), smoothed_freq, smoothed_q);
             for(auto &f: filters_) {
                 f.setCoefficients(coeff);
             }
+            qfactor_gain = get_qfactor_adjustment_gain(smoothed_q);
         }
     
         for(int channel = 0; channel < totalNumInputChannels; ++channel) {
             auto* data = buffer.getWritePointer(channel) + smp;
             filters_[channel].processSamples(data, num_to_process);
+            std::for_each(data, data + num_to_process, [qfactor_gain](float &x) {
+                x = std::clamp<float>(x * qfactor_gain, -2.0, 2.0); // あまりに大きい音が生じると危険なので、 +6dB までに制限する。
+            });
         }
     }
+    
+    last_qfactor_gain_ = qfactor_gain;
     
     {
         std::unique_lock lock(mtx_sample_history_);
