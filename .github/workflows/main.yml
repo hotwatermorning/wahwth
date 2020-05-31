@@ -61,6 +61,7 @@ jobs:
     needs: [build_win, build_mac]
     runs-on: macos-latest
     steps:
+    - uses: actions/checkout@v2
     - name: Export version
       run: |
           WAHWTH_VERSION=$(cmake -P cmake/ShowVersion.cmake 2>&1)
