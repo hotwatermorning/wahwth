@@ -381,7 +381,7 @@ private:
             detector = dlib::get_frontal_face_detector();
 
             juce::File executable_dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-            juce::File landmark_file = executable_dir.getChildFile("shape_predictor_68_face_landmarks.dat");
+            juce::File landmark_file = executable_dir.getChildFile("Data/shape_predictor_68_face_landmarks.dat");
             if(landmark_file.existsAsFile() == false) {
                 landmark_file = executable_dir.getParentDirectory().getChildFile("Resources/shape_predictor_68_face_landmarks.dat");
             }

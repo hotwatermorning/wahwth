@@ -156,11 +156,11 @@ if(MSVC)
         TARGET Wahwth
         POST_BUILD
         COMMAND echo mkdir for standalone
-        COMMAND mkdir "\"${BINARY_DIR}\\Standalone\"" & cmd /c exit 0
+        COMMAND mkdir "\"${BINARY_DIR}\\Standalone\\Data\"" & cmd /c exit 0
         COMMAND echo mkdir for VST3
         COMMAND mkdir "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\"" & cmd /c exit 0
         COMMAND echo copy the landmark file for standalone
-        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\\""
+        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\Data\\\""
         COMMAND echo copy the landmark file for VST3
         COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\\\""
         COMMENT "Deploy the landmark file."
