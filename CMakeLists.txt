@@ -20,6 +20,8 @@ set(DLIB_PNG_SUPPORT OFF)
 
 cmake_minimum_required(VERSION 3.15)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/Version.cmake")
+
 # The top-level CMakeLists.txt file for a project must contain a literal, direct call to the
 # `project()` command. `project()` sets up some helpful variables that describe source/binary
 # directories, and the current project version. This is a standard CMake command.
@@ -49,7 +51,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/dlib)
 # Check the readme at `examples/CMake` in the JUCE repo for the full list.
 
 juce_add_plugin(Wahwth
-    VERSION 0.9.2                               # Set this if the plugin version is different to the project version
+    VERSION "${WAHWTH_VERSION}"                 # Set this if the plugin version is different to the project version
     # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
     # ICON_SMALL ...
     COMPANY_NAME "diatonic.jp"                  # Specify the name of the plugin's author

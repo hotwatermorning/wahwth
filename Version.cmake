@@ -1,0 +1,1 @@
+set(WAHWTH_VERSION 0.9.2)
