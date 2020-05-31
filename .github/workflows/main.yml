@@ -65,7 +65,7 @@ jobs:
     - name: Export version
       run: |
           WAHWTH_VERSION=$(cmake -P cmake/ShowVersion.cmake 2>&1)
-          echo "::set-env name=WAHWTH_VERSION=${WAHWTH_VERSION}"
+          echo "::set-env name=WAHWTH_VERSION::${WAHWTH_VERSION}"
     - name: Create a Release
       id: create_release
       env:
