@@ -1,0 +1,98 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_win:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Prepare Project
+      run: |
+        git submodule update --init --recursive
+        New-Item build -Force -ItemType Directory 
+        cd build
+        cmake -G "Visual Studio 16 2019" -A x64 ..
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release
+    - name: Archive
+      run: |
+        cd build/Wahwth_artefacts/Release
+        Compress-Archive -Path .\* -DestinationPath ..\wahwth-release-win.zip
+    - name: Upload
+      uses: actions/upload-artifact@v2
+      with:
+        name: wahwth-release-win.zip
+        path: build/Wahwth_artefacts/wahwth-release-win.zip
+  build_mac:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Prepare Project
+      run: |
+        git submodule update --init --recursive
+        mkdir -p build
+        cd build
+        cmake -G "Xcode" ..
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release
+    - name: Archive
+      run: |
+        cd build/Wahwth_artefacts/Release
+        zip -r ../wahwth-release-mac.zip ./
+    - name: Upload
+      uses: actions/upload-artifact@v2
+      with:
+        name: wahwth-release-mac.zip
+        path: build/Wahwth_artefacts/wahwth-release-mac.zip
+  release:
+    needs: [build_win, build_mac]
+    runs-on: macos-latest
+    steps:
+    - name: Create a Release
+      id: create_release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        draft: true
+    - name: Download (Win)
+      uses: actions/download-artifact@v2
+      with:
+        name: wahwth-release-win.zip
+    - name: Download (Mac)
+      uses: actions/download-artifact@v2
+      with:
+        name: wahwth-release-mac.zip
+    - name: Upload Release Archives (Win)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-release-asset@v1.0.2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./wahwth-release-win.zip
+        asset_name: wahwth-release-win.zip
+        asset_content_type: application/zip
+    - name: Upload Release Archives (Mac)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/upload-release-asset@v1.0.2
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./wahwth-release-mac.zip
+        asset_name: wahwth-release-mac.zip
+        asset_content_type: application/zip
