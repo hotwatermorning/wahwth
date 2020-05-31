@@ -71,8 +71,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ format("v{}", env.WAHWTH_VERSION) }}
-        release_name: ${{ format("release-{}", env.WAHWTH_VERSION) }}
+        tag_name: ${{ format('v{0}', env.WAHWTH_VERSION) }}
+        release_name: ${{ format('release-{0}', env.WAHWTH_VERSION) }}
         draft: true
     - name: Download (Win)
       uses: actions/download-artifact@v2
@@ -89,7 +89,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./wahwth-release-win.zip
-        asset_name: ${{ format("wahwth-{}-win.zip", env.WAHWTH_VERSION) }}
+        asset_name: ${{ format('wahwth-{0}-win.zip', env.WAHWTH_VERSION) }}
         asset_content_type: application/zip
     - name: Upload Release Archives (Mac)
       env:
@@ -98,5 +98,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./wahwth-release-mac.zip
-        asset_name: ${{ format("wahwth-{}-mac.zip", env.WAHWTH_VERSION) }}
+        asset_name: ${{ format('wahwth-{0}-mac.zip', env.WAHWTH_VERSION) }}
         asset_content_type: application/zip
