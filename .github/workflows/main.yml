@@ -51,7 +51,7 @@ jobs:
     - name: Archive
       run: |
         cd build/Wahwth_artefacts/Release
-        zip -r ../wahwth-release-mac.zip ./
+        zip -r --symlinks ../wahwth-release-mac.zip .
     - name: Upload
       uses: actions/upload-artifact@v2
       with:
@@ -61,14 +61,19 @@ jobs:
     needs: [build_win, build_mac]
     runs-on: macos-latest
     steps:
+    - uses: actions/checkout@v2
+    - name: Export version
+      run: |
+          WAHWTH_VERSION=$(cmake -P cmake/ShowVersion.cmake 2>&1)
+          echo "::set-env name=WAHWTH_VERSION::${WAHWTH_VERSION}"
     - name: Create a Release
       id: create_release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       uses: actions/create-release@v1
       with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
+        tag_name: ${{ format('v{0}', env.WAHWTH_VERSION) }}
+        release_name: ${{ format('release-{0}', env.WAHWTH_VERSION) }}
         draft: true
     - name: Download (Win)
       uses: actions/download-artifact@v2
@@ -85,7 +90,7 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./wahwth-release-win.zip
-        asset_name: wahwth-release-win.zip
+        asset_name: ${{ format('wahwth-{0}-win.zip', env.WAHWTH_VERSION) }}
         asset_content_type: application/zip
     - name: Upload Release Archives (Mac)
       env:
@@ -94,5 +99,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./wahwth-release-mac.zip
-        asset_name: wahwth-release-mac.zip
+        asset_name: ${{ format('wahwth-{0}-mac.zip', env.WAHWTH_VERSION) }}
         asset_content_type: application/zip

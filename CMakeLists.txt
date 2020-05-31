@@ -20,6 +20,8 @@ set(DLIB_PNG_SUPPORT OFF)
 
 cmake_minimum_required(VERSION 3.15)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/Version.cmake")
+
 # The top-level CMakeLists.txt file for a project must contain a literal, direct call to the
 # `project()` command. `project()` sets up some helpful variables that describe source/binary
 # directories, and the current project version. This is a standard CMake command.
@@ -49,7 +51,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/ext/dlib)
 # Check the readme at `examples/CMake` in the JUCE repo for the full list.
 
 juce_add_plugin(Wahwth
-    VERSION 0.9.1                               # Set this if the plugin version is different to the project version
+    VERSION "${WAHWTH_VERSION}"                 # Set this if the plugin version is different to the project version
     # ICON_BIG ...                              # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
     # ICON_SMALL ...
     COMPANY_NAME "diatonic.jp"                  # Specify the name of the plugin's author
@@ -146,6 +148,7 @@ target_compile_options(Wahwth
 
 set(LANDMARK_FILE "${CMAKE_CURRENT_SOURCE_DIR}/shape_predictor_68_face_landmarks.dat")
 set(BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/Wahwth_artefacts/$<CONFIG>")
+set(RESOURCES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/resources")
 
 if(MSVC)
     # copy command can't treat slash as a path separator unlike cd command.
@@ -156,14 +159,19 @@ if(MSVC)
         TARGET Wahwth
         POST_BUILD
         COMMAND echo mkdir for standalone
-        COMMAND mkdir "\"${BINARY_DIR}\\Standalone\"" & cmd /c exit 0
+        COMMAND mkdir "\"${BINARY_DIR}\\Standalone\\Data\"" & cmd /c exit 0
         COMMAND echo mkdir for VST3
         COMMAND mkdir "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\"" & cmd /c exit 0
         COMMAND echo copy the landmark file for standalone
-        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\\""
+        COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\Data\\\""
         COMMAND echo copy the landmark file for VST3
         COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\\\""
+        COMMAND echo copy resource files
+        COMMAND copy "\"${RESOURCES_DIR}\\README-ja.md\"" "\"${BINARY_DIR}\""
+        COMMAND copy "\"${RESOURCES_DIR}\\win\\Install-Wahwth-VST3.bat\"" "\"${BINARY_DIR}\\VST3\""
+        COMMAND copy "\"${RESOURCES_DIR}\\win\\Uninstall-Wahwth-VST3.bat\"" "\"${BINARY_DIR}\\VST3\""
         COMMENT "Deploy the landmark file."
+
         )
 else()
     add_custom_command(
@@ -181,6 +189,12 @@ else()
         COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
         COMMAND echo copy the landmarkfile for AU
         COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/AU/Wahwth.component/Contents/Resources/\""
+        COMMAND echo copy resource files
+        COMMAND cp "\"${RESOURCES_DIR}/README-ja.md\"" "\"${BINARY_DIR}\""
+        COMMAND echo prepare installation path symlinks
+        COMMAND cd "\"${BINARY_DIR}/Standalone\"" && ln -f -s "/Applications" "."
+        COMMAND cd "\"${BINARY_DIR}/VST3\"" && ln -f -s "/Library/Audio/Plug-Ins/VST3" "."
+        COMMAND cd "\"${BINARY_DIR}/AU\"" && ln -f -s "/Library/Audio/Plug-Ins/Components" "."
         COMMENT "Deploy the landmark file."
         )
 endif()

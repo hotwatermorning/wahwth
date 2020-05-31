@@ -68,7 +68,7 @@ public:
     
     static constexpr float kQFactorMin = 0.1;
     static constexpr float kQFactorMax = 7.0;
-    static constexpr float kQFactorDefault = 5.0;
+    static constexpr float kQFactorDefault = 3.0;
     
     static constexpr float kLowFreqMin = 100;
     static constexpr float kLowFreqMax = 1000;
@@ -105,6 +105,7 @@ private:
     std::vector<juce::IIRFilter> filters_;
     float last_freq_;
     float last_q_;
+    float last_qfactor_gain_;
     juce::SmoothedValue<float> smooth_freq_;
     juce::SmoothedValue<float> smooth_q_;
     

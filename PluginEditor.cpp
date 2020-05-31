@@ -18,6 +18,7 @@ int const kDefaultWidth = 600;
 int const kDefaultHeight = 450;
 int const kProcessImageWidth = kDefaultWidth / 2;
 int const kProcessImageHeight = kDefaultHeight / 2;
+float const kDBRangeMin = -60.0;
 
 template<class PixelType>
 struct dlib_pixel_type_to_juce_pixel_format;
@@ -282,9 +283,9 @@ struct AudioPluginAudioProcessorEditor::Impl
                                       fft_buffer_[i*2+1] * fft_buffer_[i*2+1]);
             
             if(amp_spec == 0) {
-                spectrum_[i] = -120;
+                spectrum_[i] = kDBRangeMin;
             } else {
-                spectrum_[i] = std::max<float>(-120, std::log10(amp_spec) * 20);
+                spectrum_[i] = std::max<float>(kDBRangeMin, std::log10(amp_spec) * 20);
             }
         }
         
@@ -381,7 +382,7 @@ private:
             detector = dlib::get_frontal_face_detector();
 
             juce::File executable_dir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
-            juce::File landmark_file = executable_dir.getChildFile("shape_predictor_68_face_landmarks.dat");
+            juce::File landmark_file = executable_dir.getChildFile("Data/shape_predictor_68_face_landmarks.dat");
             if(landmark_file.existsAsFile() == false) {
                 landmark_file = executable_dir.getParentDirectory().getChildFile("Resources/shape_predictor_68_face_landmarks.dat");
             }
@@ -817,8 +818,8 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
         
         float x1 = log10((i / (double)end) * kLogEmphasisCoeff + 1.0) / log10(kLogEmphasisCoeff + 1.0) * b.getWidth() + b.getX();
         float x2 = log10(((i+1) / (double)end) * kLogEmphasisCoeff + 1.0) / log10(kLogEmphasisCoeff + 1.0) * b.getWidth() + b.getX();
-        float y1 = (-s1 / (double)120) * b.getHeight() + b.getY();
-        float y2 = (-s2 / (double)120) * b.getHeight() + b.getY();
+        float y1 = (s1 / (double)kDBRangeMin) * b.getHeight() + b.getY();
+        float y2 = (s2 / (double)kDBRangeMin) * b.getHeight() + b.getY();
 
         assert(last_x < x1);
         assert(x1 < x2);
