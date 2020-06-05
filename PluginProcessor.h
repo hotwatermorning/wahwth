@@ -82,7 +82,7 @@ public:
     static constexpr int kCameraIndexMax = 127;
     static constexpr int kFlipFlagDefault = true;
     
-    struct EditorData {
+    struct alignas(8) EditorData {
         int camera_index_ = kCameraIndexMin;
         bool flip_ = kFlipFlagDefault;
     };
