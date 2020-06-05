@@ -166,12 +166,7 @@ if(MSVC)
         COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\Standalone\\Data\\\""
         COMMAND echo copy the landmark file for VST3
         COMMAND copy "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}\\VST3\\Wahwth.vst3\\Contents\\Resources\\\""
-        COMMAND echo copy resource files
-        COMMAND copy "\"${RESOURCES_DIR}\\README-ja.md\"" "\"${BINARY_DIR}\""
-        COMMAND copy "\"${RESOURCES_DIR}\\win\\Install-Wahwth-VST3.bat\"" "\"${BINARY_DIR}\\VST3\""
-        COMMAND copy "\"${RESOURCES_DIR}\\win\\Uninstall-Wahwth-VST3.bat\"" "\"${BINARY_DIR}\\VST3\""
         COMMENT "Deploy the landmark file."
-
         )
 else()
     add_custom_command(
@@ -189,12 +184,6 @@ else()
         COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/VST3/Wahwth.vst3/Contents/Resources/\""
         COMMAND echo copy the landmarkfile for AU
         COMMAND cp "\"${LANDMARK_FILE}\"" "\"${BINARY_DIR}/AU/Wahwth.component/Contents/Resources/\""
-        COMMAND echo copy resource files
-        COMMAND cp "\"${RESOURCES_DIR}/README-ja.md\"" "\"${BINARY_DIR}\""
-        COMMAND echo prepare installation path symlinks
-        COMMAND cd "\"${BINARY_DIR}/Standalone\"" && ln -f -s "/Applications" "."
-        COMMAND cd "\"${BINARY_DIR}/VST3\"" && ln -f -s "/Library/Audio/Plug-Ins/VST3" "."
-        COMMAND cd "\"${BINARY_DIR}/AU\"" && ln -f -s "/Library/Audio/Plug-Ins/Components" "."
         COMMENT "Deploy the landmark file."
         )
 endif()

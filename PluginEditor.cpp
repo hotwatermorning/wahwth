@@ -10,15 +10,19 @@
 
 bool kShowFace = true;
 
-int const kMinWidth = 400;
-int const kMinHeight = 300;
-int const kMaxWidth = 1200;
-int const kMaxHeight = 900;
-int const kDefaultWidth = 600;
-int const kDefaultHeight = 450;
-int const kProcessImageWidth = kDefaultWidth / 2;
-int const kProcessImageHeight = kDefaultHeight / 2;
-float const kDBRangeMin = -60.0;
+constexpr int kMinWidth = 400;
+constexpr int kMinHeight = 300;
+constexpr int kMaxWidth = 1200;
+constexpr int kMaxHeight = 900;
+constexpr int kDefaultWidth = 600;
+constexpr int kDefaultHeight = 450;
+constexpr int kProcessImageWidth = kDefaultWidth / 2;
+constexpr int kProcessImageHeight = kDefaultHeight / 2;
+constexpr float kDBRangeMin = -60.0;
+constexpr int kThumbnailWidth = 120;
+constexpr int kThumbnailHeight = 90;
+constexpr int kThumbnailX = 10;
+constexpr int kThumbnailY = 10;
 
 template<class PixelType>
 struct dlib_pixel_type_to_juce_pixel_format;
@@ -267,11 +271,11 @@ struct AudioPluginAudioProcessorEditor::Impl
         int const N = AP::kNumBins;
         assert(N == fft_->getSize());
         
-        //! 直流成分とナイキスト周波数成分を N で正規化する。
+        //! 直流成分とナイキスト周波数成分を 1 / N で正規化する。
         fft_buffer_[0] /= N;
         fft_buffer_[AP::kNumBins] /= N;
         
-        //! それ以外の交流成分は、 N で正規化後、 複素共役の分を考慮して 2 倍する。
+        //! それ以外の交流成分は、 1/ N で正規化後、 複素共役の分を考慮して 2 倍する。
         std::transform(fft_buffer_.data() + 1,
                        fft_buffer_.data() + N,
                        fft_buffer_.data() + 1,
@@ -320,6 +324,14 @@ struct AudioPluginAudioProcessorEditor::Impl
             cam_.reset();
         }
     }
+    
+    void setImageFlipFlag(bool flip)
+    {
+        flip_ = flip;
+    }
+    
+    bool shouldFlipImage() const { return flip_.load(); }
+    
 public:
     AudioPluginAudioProcessorEditor *owner_ = nullptr;
     std::unique_ptr<juce::CameraDevice> cam_;
@@ -343,6 +355,7 @@ private:
     
     FaceData face_data_;
     SpectrumType spectrum_;
+    std::atomic<bool> flip_ = { true };
     
     //! callAsync 呼び出し中に確保するべきミューテックス。
     /* AudioPluginAudioProcessorEditor デストラクト時に、
@@ -655,10 +668,12 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
     pimpl_->lbl_high_freq_.setText("Freq Hi", juce::NotificationType::dontSendNotification);
     pimpl_->lbl_qfactor_.setText  ("Resonance", juce::NotificationType::dontSendNotification);
     
+    auto ed = processorRef.editor_data_.load();
+    
     auto const num_cameras = pimpl_->cmb_camera_list_.getNumItems();
     if(num_cameras != 0) {
         // 保存されたカメラ番号
-        auto const try_first = std::clamp(processorRef.camera_index_.load(),
+        auto const try_first = std::clamp(ed.camera_index_,
                                           AP::kCameraIndexMin,
                                           num_cameras);
 
@@ -680,14 +695,19 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
             }
         }
     }
+    
+    pimpl_->setImageFlipFlag(ed.flip_);
 
-    processorRef.on_load_camera_index_ = [this](int index) {
-        index = std::clamp<int>(index,
-                                0,
-                                pimpl_->cmb_camera_list_.getNumItems());
+    processorRef.SetEditorDataUpdateCallback([this]() {
+        auto ed = processorRef.editor_data_.load();
+        
+        auto const index = std::clamp<int>(ed.camera_index_,
+                                           AP::kCameraIndexMin,
+                                           pimpl_->cmb_camera_list_.getNumItems());
         
         pimpl_->cmb_camera_list_.setSelectedItemIndex(index);
-    };
+        pimpl_->setImageFlipFlag(ed.flip_);
+    });
     
     getConstrainer()->setFixedAspectRatio((double)kMaxWidth / kMaxHeight);
     setBounds(0, 0, kDefaultWidth, kDefaultHeight);
@@ -700,7 +720,7 @@ AudioPluginAudioProcessorEditor::AudioPluginAudioProcessorEditor (AudioPluginAud
 
 AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 {
-    processorRef.on_load_camera_index_ = nullptr;
+    processorRef.SetEditorDataUpdateCallback(nullptr);
     
     pimpl_->closeCamera();
     
@@ -709,6 +729,54 @@ AudioPluginAudioProcessorEditor::~AudioPluginAudioProcessorEditor()
 #endif
     
     pimpl_.reset();
+}
+
+void AudioPluginAudioProcessorEditor::OnUpdateMouthAspectRatio()
+{
+    auto const face_data = pimpl_->getFaceData();
+    
+    double const kMarMin = 0.4;
+    double const kMarMax = 0.95;
+    
+    double const mar = std::clamp(face_data.mar_.GetAverage(), kMarMin, kMarMax);
+    double const freq = (mar - kMarMin) / (kMarMax - kMarMin);
+    
+    auto *param = processorRef.freq_;
+    param->setValueNotifyingHost(freq);
+
+    repaint();
+}
+
+void AudioPluginAudioProcessorEditor::sliderValueChanged(juce::Slider *s)
+{
+    if(s == &pimpl_->sl_qfactor_) {
+        auto *param = processorRef.qfactor_;
+        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
+    } else if(s == &pimpl_->sl_low_freq_) {
+        auto *param = processorRef.low_freq_;
+        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
+    } else if(s == &pimpl_->sl_high_freq_) {
+        auto *param = processorRef.high_freq_;
+        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
+    } else {
+        assert(false);
+    }
+}
+
+void AudioPluginAudioProcessorEditor::comboBoxChanged(juce::ComboBox *c)
+{
+    if(c == &pimpl_->cmb_camera_list_) {
+        auto const item_index = c->getSelectedItemIndex();
+        if(pimpl_->openCamera(item_index)) {
+            auto tmp = processorRef.editor_data_.load();
+            tmp.camera_index_ = item_index;
+            processorRef.editor_data_ = tmp;
+        } else {
+            c->setSelectedId(0, juce::NotificationType::dontSendNotification);
+        }
+    } else {
+        assert(false);
+    }
 }
 
 //==============================================================================
@@ -720,15 +788,16 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
     auto const face_data = pimpl_->getFaceData();
     
     if(kShowFace && face_data.image_.isValid()) {
-        int const kThumbnailWidth = 120;
-        int const kThumbnailX = 10;
-        int const kThumbnailY = 10;
-        
         double scale = face_data.image_.getWidth() / (double)kThumbnailWidth;
         juce::AffineTransform t;
-        t = t.scaled(-1, 1.0); // カメラから取得した画像を、顔の動きに合うように左右反転して表示する。
-        t = t.scaled(1.0 / scale);
-        t = t.translated(kThumbnailWidth + kThumbnailX, kThumbnailY);
+        if(pimpl_->shouldFlipImage()) {
+            t = t.scaled(1.0 / scale);
+            t = t.scaled(-1, 1.0); // カメラから取得した画像を、顔の動きに合うように左右反転して表示する。
+            t = t.translated(kThumbnailWidth + kThumbnailX, kThumbnailY);
+        } else {
+            t = t.scaled(1.0 / scale);
+            t = t.translated(kThumbnailX, kThumbnailY);
+        }
         g.drawImageTransformed(face_data.image_, t);
      }
     
@@ -783,8 +852,10 @@ void AudioPluginAudioProcessorEditor::paint (juce::Graphics& g)
             auto bx = avg_b.x();
             auto by = avg_b.y();
             
-            ax = (ax - b_mouth.getCentre().x) * -1 + b_mouth.getCentre().x;
-            bx = (bx - b_mouth.getCentre().x) * -1 + b_mouth.getCentre().x;
+            if(pimpl_->shouldFlipImage()) {
+                ax = (ax - b_mouth.getCentre().x) * -1 + b_mouth.getCentre().x;
+                bx = (bx - b_mouth.getCentre().x) * -1 + b_mouth.getCentre().x;
+            }
             
             g.drawLine((ax - shift_mouth.x) * scale + shift_area.x,
                        (ay - shift_mouth.y) * scale + shift_area.y,
@@ -861,59 +932,36 @@ void AudioPluginAudioProcessorEditor::resized()
     align_label_and_control(pimpl_->lbl_qfactor_, pimpl_->sl_qfactor_, right.removeFromTop(20));
 }
 
-void AudioPluginAudioProcessorEditor::OnUpdateMouthAspectRatio()
-{
-    auto const face_data = pimpl_->getFaceData();
-    
-    double const kMarMin = 0.4;
-    double const kMarMax = 0.95;
-    
-    double const mar = std::clamp(face_data.mar_.GetAverage(), kMarMin, kMarMax);
-    double const freq = (mar - kMarMin) / (kMarMax - kMarMin);
-    
-    auto *param = processorRef.freq_;
-    param->setValueNotifyingHost(freq);
-
-    repaint();
-}
-
-void AudioPluginAudioProcessorEditor::sliderValueChanged(juce::Slider *s)
-{
-    if(s == &pimpl_->sl_qfactor_) {
-        auto *param = processorRef.qfactor_;
-        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
-    } else if(s == &pimpl_->sl_low_freq_) {
-        auto *param = processorRef.low_freq_;
-        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
-    } else if(s == &pimpl_->sl_high_freq_) {
-        auto *param = processorRef.high_freq_;
-        param->setValueNotifyingHost(param->convertTo0to1(s->getValue()));
-    } else {
-        assert(false);
-    }
-}
-
-void AudioPluginAudioProcessorEditor::comboBoxChanged(juce::ComboBox *c)
-{
-    if(c == &pimpl_->cmb_camera_list_) {
-        auto const item_index = c->getSelectedItemIndex();
-        if(pimpl_->openCamera(item_index)) {
-            processorRef.camera_index_ = item_index;
-        } else {
-            c->setSelectedId(0, juce::NotificationType::dontSendNotification);
-        }
-    } else {
-        assert(false);
-    }
-}
-
 void AudioPluginAudioProcessorEditor::mouseUp(juce::MouseEvent const&e)
 {
-    juce::PopupMenu menu;
-    menu.addItem(1, "About...");
+    auto const p = e.getPosition();
     
-    int result = menu.show();
-    if(result == 1) {
-        showModalAboutDialog(this);
+    // サムネイル領域で右クリックした場合は画像の反転メニューを表示する。
+    if(e.mods == juce::ModifierKeys::rightButtonModifier &&
+       kThumbnailX <= p.x && p.x < (kThumbnailX + kThumbnailWidth) &&
+       kThumbnailY <= p.y && p.y < (kThumbnailY + kThumbnailHeight))
+    {
+        juce::PopupMenu m;
+        m.addItem("Invert", [this]() {
+            auto const new_flag = pimpl_->shouldFlipImage() == false;
+            pimpl_->setImageFlipFlag(new_flag);
+            auto tmp = processorRef.editor_data_.load();
+            tmp.flip_ = new_flag;
+            processorRef.editor_data_ = tmp;
+        });
+        
+        m.show();
+        return;
+    }
+    
+    // それ以外の場所を右クリックした場合は About ダイアログを表示する。
+    if(e.mods == juce::ModifierKeys::rightButtonModifier) {
+        juce::PopupMenu menu;
+        menu.addItem(1, "About...");
+        
+        int result = menu.show();
+        if(result == 1) {
+            showModalAboutDialog(this);
+        }
     }
 }

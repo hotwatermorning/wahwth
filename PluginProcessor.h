@@ -80,12 +80,19 @@ public:
     
     static constexpr int kCameraIndexMin = 0;
     static constexpr int kCameraIndexMax = 127;
+    static constexpr int kFlipFlagDefault = true;
     
-    //! カメラ番号
-    std::atomic<int> camera_index_ = kCameraIndexMin;
-
-    //! カメラ番号を読み込んだときに呼び出されるコールバック
-    std::function<void(int)> on_load_camera_index_;
+    struct alignas(8) EditorData {
+        int camera_index_ = kCameraIndexMin;
+        bool flip_ = kFlipFlagDefault;
+    };
+    
+    //! ファイルから読み込んだエディタ情報
+    std::atomic<EditorData> editor_data_;
+    
+    using EditorDataUpdateCallback = std::function<void()>;
+    
+    void SetEditorDataUpdateCallback(EditorDataUpdateCallback cb);
     
     static constexpr int kOrder = 8;
     static constexpr int kNumBins = 1 << kOrder;
@@ -109,6 +116,9 @@ private:
     juce::SmoothedValue<float> smooth_freq_;
     juce::SmoothedValue<float> smooth_q_;
     
+    std::mutex editor_data_update_mutex_;
+    //! ファイルから Editor データを読み込んだ直後に呼び出されるコールバック
+    EditorDataUpdateCallback on_update_editor_data_;
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AudioPluginAudioProcessor)
