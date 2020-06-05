@@ -18,22 +18,20 @@ jobs:
     - name: Prepare Project
       run: |
         git submodule update --init --recursive
-        New-Item build -Force -ItemType Directory 
+        New-Item build -Force -ItemType Directory
         cd build
         cmake -G "Visual Studio 16 2019" -A x64 ..
     - name: Build
       run: |
         cd build
         cmake --build . --config Release
-    - name: Archive
-      run: |
-        cd build/Wahwth_artefacts/Release
-        Compress-Archive -Path .\* -DestinationPath ..\wahwth-release-win.zip
+    - name: Collect and Archive
+      run: .\release-tool\prepare-package.ps1
     - name: Upload
       uses: actions/upload-artifact@v2
       with:
         name: wahwth-release-win.zip
-        path: build/Wahwth_artefacts/wahwth-release-win.zip
+        path: build/wahwth-release-win.zip
   build_mac:
     runs-on: macos-latest
     steps:
@@ -48,15 +46,13 @@ jobs:
       run: |
         cd build
         cmake --build . --config Release
-    - name: Archive
-      run: |
-        cd build/Wahwth_artefacts/Release
-        zip -r --symlinks ../wahwth-release-mac.zip .
+    - name: Collect and Archive
+      run: ./release-tool/prepare-package.sh
     - name: Upload
       uses: actions/upload-artifact@v2
       with:
         name: wahwth-release-mac.zip
-        path: build/Wahwth_artefacts/wahwth-release-mac.zip
+        path: build/wahwth-release-mac.zip
   release:
     needs: [build_win, build_mac]
     runs-on: macos-latest
@@ -64,8 +60,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Export version
       run: |
-          WAHWTH_VERSION=$(cmake -P cmake/ShowVersion.cmake 2>&1)
-          echo "::set-env name=WAHWTH_VERSION::${WAHWTH_VERSION}"
+        WAHWTH_VERSION=$(cmake -P cmake/ShowVersion.cmake 2>&1)
+        echo "::set-env name=WAHWTH_VERSION::${WAHWTH_VERSION}"
     - name: Create a Release
       id: create_release
       env:
