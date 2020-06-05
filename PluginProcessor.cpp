@@ -262,7 +262,10 @@ void AudioPluginAudioProcessor::getStateInformation (juce::MemoryBlock& destData
     xml->setAttribute(low_freq_->paramID, (double)*low_freq_);
     xml->setAttribute(high_freq_->paramID, (double)*high_freq_);
     xml->setAttribute(qfactor_->paramID, (double)*qfactor_);
-    xml->setAttribute("camera", camera_index_.load());
+    
+    auto ed = editor_data_.load();
+    xml->setAttribute("camera", ed.camera_index_);
+    xml->setAttribute("flip-image", ed.flip_);
     copyXmlToBinary(*xml, destData);
 }
 
@@ -281,11 +284,24 @@ void AudioPluginAudioProcessor::setStateInformation (const void* data, int sizeI
     *low_freq_  = xml->getDoubleAttribute(low_freq_->paramID, kLowFreqDefault);
     *high_freq_ = xml->getDoubleAttribute(high_freq_->paramID, kHighFreqDefault);
     *qfactor_   = xml->getDoubleAttribute(qfactor_->paramID, kQFactorDefault);
-    camera_index_ = std::clamp<int>(xml->getIntAttribute("camera", 0), kCameraIndexMin, kCameraIndexMax);
     
-    if(on_load_camera_index_) {
-        on_load_camera_index_(camera_index_.load());
+    EditorData ed;
+    ed.camera_index_ = std::clamp<int>(xml->getIntAttribute("camera", 0), kCameraIndexMin, kCameraIndexMax);
+    ed.flip_ = xml->getBoolAttribute("flip-image", kFlipFlagDefault);
+    editor_data_ = ed;
+    
+    {
+        std::unique_lock lock(editor_data_update_mutex_);
+        if(on_update_editor_data_) {
+            on_update_editor_data_();
+        }
     }
+}
+
+void AudioPluginAudioProcessor::SetEditorDataUpdateCallback(EditorDataUpdateCallback cb)
+{
+    std::unique_lock lock(editor_data_update_mutex_);
+    on_update_editor_data_ = cb;
 }
 
 void AudioPluginAudioProcessor::getSampleHistory(std::vector<float> &hist)

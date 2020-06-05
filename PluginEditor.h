@@ -14,10 +14,6 @@ public:
     explicit AudioPluginAudioProcessorEditor (AudioPluginAudioProcessor&);
     ~AudioPluginAudioProcessorEditor() override;
 
-    //==============================================================================
-    void paint (juce::Graphics&) override;
-    void resized() override;
-
 private:
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
@@ -28,6 +24,8 @@ private:
     
     void OnUpdateMouthAspectRatio();
 
+    void paint (juce::Graphics&) override;
+    void resized() override;
     void sliderValueChanged(juce::Slider *s) override;
     void comboBoxChanged(juce::ComboBox *c) override;
     void mouseUp (juce::MouseEvent const&e) override;
