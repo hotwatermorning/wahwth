@@ -3,7 +3,9 @@ cd "$PSScriptRoot"
 cd ..\build
 
 # renew a temporary release directory
-Remove-Item -Path tmp_release -Force -Recurse
+if (Test-Path tmp_release) {
+  Remove-Item -Path tmp_release -Force -Recurse
+}
 New-Item tmp_release -Force -ItemType Directory
 
 # copy binary files into the temporary release directory

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e -u
+
 SCRIPT_DIR=$(cd $(dirname $0); pwd)
 
 # cd into the build directory
