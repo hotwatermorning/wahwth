@@ -23,7 +23,7 @@ ln -f -s "/Library/Audio/Plug-Ins/VST3" "tmp_release/VST3"
 ln -f -s "/Library/Audio/Plug-Ins/Components" "tmp_release/AU"
 
 # copy resource files for release
-cp "../resource/README-ja.pdf" "tmp_release"
+cp "../resources/README-ja.pdf" "tmp_release"
 
 # create zip archive
 cd tmp_release

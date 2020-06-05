@@ -13,9 +13,9 @@ Copy-Item -Path .\Wahwth_artefacts\Release\Standalone -Destination tmp_release -
 Copy-Item -Path .\Wahwth_artefacts\Release\VST3 -Destination tmp_release -Recurse
 
 # copy resource files for release
-Copy-Item -Path ..\resource\README-ja.pdf -Destination tmp_release
-Copy-Item -Path ..\resource\win\Install-Wahwth-VST3.bat -Destination tmp_release\VST3
-Copy-Item -Path ..\resource\win\Uninstall-Wahwth-VST3.bat -Destination tmp_release\VST3
+Copy-Item -Path ..\resources\README-ja.pdf -Destination tmp_release
+Copy-Item -Path ..\resources\win\Install-Wahwth-VST3.bat -Destination tmp_release\VST3
+Copy-Item -Path ..\resources\win\Uninstall-Wahwth-VST3.bat -Destination tmp_release\VST3
 
 # create zip archive
 cd tmp_release
