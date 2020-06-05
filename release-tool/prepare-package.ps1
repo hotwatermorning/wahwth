@@ -9,8 +9,9 @@ if (Test-Path tmp_release) {
 New-Item tmp_release -Force -ItemType Directory
 
 # copy binary files into the temporary release directory
+New-Item tmp_release\VST3
 Copy-Item -Path .\Wahwth_artefacts\Release\Standalone -Destination tmp_release -Recurse
-Copy-Item -Path .\Wahwth_artefacts\Release\VST3 -Destination tmp_release -Recurse
+Copy-Item -Path .\Wahwth_artefacts\Release\VST3\Wahwth.vst3 -Destination tmp_release\VST3 -Recurse
 
 # copy resource files for release
 Copy-Item -Path ..\resources\README-ja.pdf -Destination tmp_release
