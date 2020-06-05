@@ -9,7 +9,7 @@
 Zip ファイルを展開すると以下のファイルが作成されます。
 
 ```txt
-wahwth-release-win
+wahwth-<バージョン番号>-win
 ├── Standalone
 │   ├── Wahwth.exe         # スタンドアロンアプリケーション
 │   └── Data               # データフォルダ
@@ -35,7 +35,7 @@ wahwth-release-win
 Zip ファイルを展開すると以下のファイルが作成されます。
 
 ```txt
-wahwth-release-mac/
+wahwth-<バージョン番号>-mac/
 ├── AU
 │   ├── Wahwth.component   # AudioUnit プラグイン
 │   └── Components         # /Library/Audio/Plug-Ins/Components へのショートカット
